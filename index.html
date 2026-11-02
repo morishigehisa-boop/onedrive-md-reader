@@ -17,7 +17,7 @@
     <header class="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shadow-sm">
         <h1 class="text-lg font-bold text-slate-700">📖 OneDrive Markdown Reader</h1>
         <div id="auth-section">
-            <button id="login-btn" onclick="window.login()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            <button id="login-btn" onclick="login()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
                 Microsoft ログイン
             </button>
         </div>
@@ -31,7 +31,7 @@
             <div class="mb-3">
                 <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">検索対象フォルダ</h2>
                 <div class="flex gap-2">
-                    <input id="target-folder" type="text" placeholder="例: Documents や フォルダ名" class="flex-1 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500">
+                    <input id="target-folder" type="text" placeholder="例: Documents/デスクトップ/yt分析/channels" class="flex-1 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500">
                     <button onclick="changeFolderAndReload()" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-1 rounded text-xs transition">更新</button>
                 </div>
                 <p class="text-[10px] text-slate-400 mt-1">※空欄でルート全体。サブフォルダ内も再帰検索します。</p>
@@ -50,7 +50,55 @@
         </aside>
 
         <!-- Content Area: Markdown Viewer -->
-        <section class="md:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col h-[75vh] md:h-[calc(100vh-8rem)]">
+        <section class="md:col-span-3 bg-white rounded-xl shadow-lg border border-slate-200 p-6 flex flex-col h-[75vh] md:h-[calc(100vh-8rem)]">
             <div id="viewer-header" class="border-b pb-3 mb-4 flex justify-between items-center hidden">
                 <div>
-                    <span id="current-file-name" class="font-
+                    <span id="current-file-name" class="font-bold text-slate-700 text-base">ファイル未選択</span>
+                    <span id="current-file-path" class="block text-xs text-slate-400 mt-0.5"></span>
+                </div>
+                <span id="sync-status" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">同期済み</span>
+            </div>
+            <div id="markdown-viewer" class="overflow-y-auto flex-1 prose max-w-none text-slate-700 leading-relaxed pr-2">
+                <div class="text-center py-20 text-slate-400">
+                    <p class="text-lg mb-2">左側のリストからMarkdownファイルを選択してください。</p>
+                    <p class="text-xs">どの端末から読んでも、前回のスクロール位置が自動で同期されます。</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Script Logic -->
+    <script>
+        const CLIENT_ID = "3c6cf6bf-6af7-4bd0-ad41-cca85929f8b6";
+        
+        const msalConfig = {
+            auth: {
+                clientId: CLIENT_ID,
+                redirectUri: window.location.origin + window.location.pathname.replace(/\/[^\/]*\$/, '/'),
+            }
+        };
+
+        let msalInstance = null;
+        let accessToken = null;
+        let currentFileId = null;
+        let readingProgress = {};
+
+        // グローバル関数の先行定義
+        window.login = async function() {
+            if (!msalInstance) {
+                alert("認証システムの初期化中です。数秒待ってから再度お試しください。");
+                return;
+            }
+            try {
+                await msalInstance.loginRedirect({
+                    scopes: ["User.Read", "Files.ReadWrite"]
+                });
+            } catch (err) {
+                console.error(err);
+                alert("ログインに失敗しました。");
+            }
+        };
+
+        window.changeFolderAndReload = function() {
+            const folderInputEl = document.getElementById('target-folder');
+            if
