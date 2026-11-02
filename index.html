@@ -17,8 +17,8 @@
     <header class="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shadow-sm">
         <div class="flex items-center gap-2">
             <h1 class="text-lg font-bold text-slate-700">📖 OneDrive Markdown Reader</h1>
-            <!-- 視覚的に更新がわかるスカイブルーバッジ -->
-            <span class="bg-sky-100 text-sky-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-sky-300">v1.4.0</span>
+            <!-- 視覚的に更新がわかるピンクバッジ -->
+            <span class="bg-pink-100 text-pink-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-pink-300">v1.5.0</span>
         </div>
         <div id="auth-section">
             <button id="login-btn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
@@ -36,7 +36,7 @@
                 <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">ファイル・フォルダ絞り込み</h2>
                 <div class="flex gap-2">
                     <input id="target-filter" type="text" placeholder="例: channels または 空欄で全件" class="flex-1 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500">
-                    <button id="search-btn" type="button" class="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1 rounded text-xs transition cursor-pointer">検索</button>
+                    <button id="search-btn" type="button" class="bg-pink-600 hover:bg-pink-700 text-white px-2.5 py-1 rounded text-xs transition cursor-pointer">検索</button>
                 </div>
                 <p class="text-[10px] text-slate-400 mt-1">※OneDrive全体から.mdファイルを直接検索・抽出します。</p>
             </div>
@@ -75,10 +75,13 @@
     <script>
         const CLIENT_ID = "3c6cf6bf-6af7-4bd0-ad41-cca85929f8b6";
         
+        // リダイレクトURIからクエリパラメータ(?update=1)を除去して純粋なURLにする
+        const cleanRedirectUri = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/');
+
         const msalConfig = {
             auth: {
                 clientId: CLIENT_ID,
-                redirectUri: window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/'),
+                redirectUri: cleanRedirectUri,
             }
         };
 
@@ -86,6 +89,7 @@
         let accessToken = null;
         let currentFileId = null;
         let readingProgress = {};
+        let scrollTimeout = null;
 
         async function initMsal() {
             try {
@@ -178,7 +182,7 @@
                 const progressRes = await callGraphAPI("/me/drive/root:/reading-progress.json:/content");
                 readingProgress = progressRes || {};
 
-                // 2. OneDrive全体から検索API（search(q='.md')）で直接抽出
+                // 2. OneDrive全体から検索
                 const filterInputEl = document.getElementById('target-filter');
                 const filterWord = (filterInputEl ? filterInputEl.value : "").trim().toLowerCase();
                 const searchRes = await callGraphAPI("/me/drive/root/search(q='.md')");
@@ -253,8 +257,8 @@
                 }
 
                 viewer.onscroll = () => {
-                    clearTimeout(window.saveTimeout);
-                    window.saveTimeout = setTimeout(() => saveProgress(fileId, viewer.scrollTop), 1000);
+                    clearTimeout(scrollTimeout);
+                    scrollTimeout = setTimeout(() => saveProgress(fileId, viewer.scrollTop), 1000);
                 };
             } catch (err) {
                 console.error(err);
@@ -274,13 +278,15 @@
             }
         }
 
-        // DOM構築完了後に初期化とイベントリスナー設定
+        // === 全ての要素が読み込まれた後にイベントを安全に登録 ===
         document.addEventListener('DOMContentLoaded', () => {
+            // 初期パスの復元
             const filterInputEl = document.getElementById('target-filter');
             if (filterInputEl) {
                 filterInputEl.value = localStorage.getItem('md_reader_filter') || "channels";
             }
 
+            // HTMLにonclickは書かず、ここで直接クリックイベントを紐付けます
             const loginBtn = document.getElementById('login-btn');
             if (loginBtn) {
                 loginBtn.addEventListener('click', handleLogin);
@@ -291,6 +297,7 @@
                 searchBtn.addEventListener('click', handleSearch);
             }
 
+            // MSAL初期化
             initMsal();
         });
     </script>
