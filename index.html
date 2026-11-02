@@ -57,7 +57,7 @@
         const msalConfig = {
             auth: {
                 clientId: CLIENT_ID,
-                redirectUri: window.location.origin + window.location.pathname.replace(/\/[^\/]*\$/, '/'),
+                redirectUri: window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/'),
             }
         };
 
@@ -97,13 +97,7 @@
 
         async function callGraphAPI(endpoint, method = "GET", body = null) {
             const headers = new Headers();
-            headers.append("Authorization", `Bearer ${accessToken}`);
-            if (body) headers.append("Content-Type", "application/json");
-
-            const options = { method, headers };
-            if (body) options.body = JSON.stringify(body);
-
-            const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, options);
+            headers.append("Authorization", `Bearer ${accessToken}`); if (body) headers.append("Content-Type", "application/json");  const options = { method, headers }; if (body) options.body = JSON.stringify(body);  const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, options);
             if (!response.ok && response.status !== 404) throw new Error("Graph API Error");
             return response.status === 404 ? null : await response.json();
         }
@@ -126,4 +120,22 @@
                 }
 
                 mdFiles.forEach(file => {
-                    const div = document.createElement('div
+                    const div = document.createElement('div');
+                    div.className = "p-2 rounded-lg hover:bg-slate-100 cursor-pointer truncate transition";
+                    div.textContent = file.name;
+                    div.onclick = () => openFile(file.id, file.name);
+                    fileListEl.appendChild(div);
+                });
+            } catch (err) {
+                console.error(err);
+                alert("ファイル一覧の取得に失敗しました。");
+            }
+        }
+
+        async function openFile(fileId, fileName) {
+            currentFileId = fileId;
+            document.getElementById('viewer-header').classList.remove('hidden');
+            document.getElementById('current-file-name').textContent = fileName;
+            
+            const viewer = document.getElementById('markdown-viewer');
+            viewer.innerHTML = `<p class="text-center py-10 text-slate
