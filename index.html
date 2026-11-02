@@ -23,7 +23,7 @@
         </div>
     </header>
 
-    <!-- Main Container (Responsive Layout: Mobile stacks, Desktop side-by-side) -->
+    <!-- Main Container -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
         
         <!-- Sidebar: File List -->
@@ -51,7 +51,6 @@
 
     <!-- Script Logic -->
     <script>
-        // Azureで取得したクライアントID
         const CLIENT_ID = "3c6cf6bf-6af7-4bd0-ad41-cca85929f8b6";
         
         const msalConfig = {
@@ -71,13 +70,14 @@
             try {
                 msalInstance = new msal.PublicClientApplication(msalConfig);
                 await msalInstance.initialize();
+                console.log("MSAL Initialized successfully.");
             } catch (err) {
                 console.error("MSAL Initialization Error:", err);
             }
         }
         initMsal();
 
-        async function login() {
+        window.login = async function() {
             if (!msalInstance) {
                 alert("認証システムの初期化中です。しばらく待ってから再度お試しください。");
                 return;
@@ -93,22 +93,26 @@
                 console.error(err);
                 alert("ログインに失敗しました。");
             }
-        }
+        };
 
         async function callGraphAPI(endpoint, method = "GET", body = null) {
             const headers = new Headers();
-            headers.append("Authorization", `Bearer ${accessToken}`); if (body) headers.append("Content-Type", "application/json");  const options = { method, headers }; if (body) options.body = JSON.stringify(body);  const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, options);
+            headers.append("Authorization", `Bearer ${accessToken}`);
+            if (body) headers.append("Content-Type", "application/json");
+
+            const options = { method, headers };
+            if (body) options.body = JSON.stringify(body);
+
+            const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, options);
             if (!response.ok && response.status !== 404) throw new Error("Graph API Error");
             return response.status === 404 ? null : await response.json();
         }
 
         async function loadFilesAndProgress() {
             try {
-                // 1. 既読位置JSONデータの読み込み（なければ空オブジェクト）
                 const progressRes = await callGraphAPI("/me/drive/root:/reading-progress.json:/content");
                 readingProgress = progressRes || {};
 
-                // 2. OneDrive上のMarkdownファイル一覧を取得
                 const filesRes = await callGraphAPI("/me/drive/root/children");
                 const fileListEl = document.getElementById('file-list');
                 fileListEl.innerHTML = "";
@@ -138,4 +142,40 @@
             document.getElementById('current-file-name').textContent = fileName;
             
             const viewer = document.getElementById('markdown-viewer');
-            viewer.innerHTML = `<p class="text-center py-10 text-slate
+            viewer.innerHTML = `<p class="text-center py-10 text-slate-400">読み込み中...</p>`;
+
+            try {
+                const contentRes = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/content`, {
+                    headers: { "Authorization": `Bearer ${accessToken}` }
+                });
+                const markdownText = await contentRes.text();
+                viewer.innerHTML = marked.parse(markdownText);
+
+                if (readingProgress[fileId]) {
+                    viewer.scrollTop = readingProgress[fileId];
+                }
+
+                viewer.onscroll = () => {
+                    clearTimeout(window.saveTimeout);
+                    window.saveTimeout = setTimeout(() => saveProgress(fileId, viewer.scrollTop), 1000);
+                };
+            } catch (err) {
+                console.error(err);
+                viewer.innerHTML = `<p class="text-red-500">ファイルの読み込みに失敗しました。</p>`;
+            }
+        }
+
+        async function saveProgress(fileId, scrollTop) {
+            readingProgress[fileId] = scrollTop;
+            document.getElementById('sync-status').textContent = "同期中...";
+            try {
+                await callGraphAPI(`/me/drive/root:/reading-progress.json:/content`, "PUT", readingProgress);
+                document.getElementById('sync-status').textContent = "同期済み";
+            } catch (err) {
+                console.error(err);
+                document.getElementById('sync-status').textContent = "同期失敗";
+            }
+        }
+    </script>
+</body>
+</html>
