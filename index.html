@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Marked.js for Markdown Rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.js"></script>
-    <!-- Microsoft Graph SDK (Browser Auth via jsDelivr for stability) -->
+    <!-- Microsoft Graph SDK (Browser Auth) -->
     <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
@@ -65,7 +65,7 @@
         let currentFileId = null;
         let readingProgress = {};
 
-        // MSALの初期化
+        // MSALの初期化とリダイレクト結果の処理
         async function initMsal() {
             try {
                 if (typeof msal === 'undefined') {
@@ -73,6 +73,24 @@
                 }
                 msalInstance = new msal.PublicClientApplication(msalConfig);
                 await msalInstance.initialize();
+
+                // リダイレクトログイン後の処理
+                const response = await msalInstance.handleRedirectPromise();
+                if (response) {
+                    accessToken = response.accessToken;
+                    onLoginSuccess();
+                } else {
+                    // すでにログインセッションがあるか確認
+                    const accounts = msalInstance.getAllAccounts();
+                    if (accounts.length > 0) {
+                        const silentRes = await msalInstance.acquireTokenSilent({
+                            scopes: ["User.Read", "Files.ReadWrite"],
+                            account: accounts[0]
+                        });
+                        accessToken = silentRes.accessToken;
+                        onLoginSuccess();
+                    }
+                }
                 console.log("MSAL Initialized successfully.");
             } catch (err) {
                 console.error("MSAL Initialization Error:", err);
@@ -80,19 +98,22 @@
         }
         initMsal();
 
-        // グローバルに関数を登録
+        // ログイン成功時の共通処理
+        function onLoginSuccess() {
+            document.getElementById('auth-section').innerHTML = `<span class="text-sm text-green-600 font-medium">ログイン中</span>`;
+            loadFilesAndProgress();
+        }
+
+        // ポップアップではなくリダイレクト認証に変更してCOOPエラーを回避
         window.login = async function() {
             if (!msalInstance) {
                 alert("認証システムの初期化中です。数秒待ってから再度お試しください。");
                 return;
             }
             try {
-                const loginResponse = await msalInstance.loginPopup({
+                await msalInstance.loginRedirect({
                     scopes: ["User.Read", "Files.ReadWrite"]
                 });
-                accessToken = loginResponse.accessToken;
-                document.getElementById('auth-section').innerHTML = `<span class="text-sm text-green-600 font-medium">ログイン中</span>`;
-                loadFilesAndProgress();
             } catch (err) {
                 console.error(err);
                 alert("ログインに失敗しました。");
