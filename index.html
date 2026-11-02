@@ -9,7 +9,7 @@
     <!-- Marked.js for Markdown Rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.js"></script>
     <!-- Microsoft Graph SDK (Browser Auth) -->
-    <script src="https://alcdn.msftauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
@@ -57,16 +57,31 @@
         const msalConfig = {
             auth: {
                 clientId: CLIENT_ID,
-                redirectUri: window.location.origin,
+                redirectUri: window.location.origin + window.location.pathname.replace(/\/[^\/]*\$/, '/'),
             }
         };
 
-        const msalInstance = new msal.PublicClientApplication(msalConfig);
+        let msalInstance = null;
         let accessToken = null;
         let currentFileId = null;
         let readingProgress = {};
 
+        // MSALの初期化
+        async function initMsal() {
+            try {
+                msalInstance = new msal.PublicClientApplication(msalConfig);
+                await msalInstance.initialize();
+            } catch (err) {
+                console.error("MSAL Initialization Error:", err);
+            }
+        }
+        initMsal();
+
         async function login() {
+            if (!msalInstance) {
+                alert("認証システムの初期化中です。しばらく待ってから再度お試しください。");
+                return;
+            }
             try {
                 const loginResponse = await msalInstance.loginPopup({
                     scopes: ["User.Read", "Files.ReadWrite"]
@@ -111,62 +126,4 @@
                 }
 
                 mdFiles.forEach(file => {
-                    const div = document.createElement('div');
-                    div.className = "p-2 rounded-lg hover:bg-slate-100 cursor-pointer truncate transition";
-                    div.textContent = file.name;
-                    div.onclick = () => openFile(file.id, file.name);
-                    fileListEl.appendChild(div);
-                });
-            } catch (err) {
-                console.error(err);
-                alert("ファイル一覧の取得に失敗しました。");
-            }
-        }
-
-        async function openFile(fileId, fileName) {
-            currentFileId = fileId;
-            document.getElementById('viewer-header').classList.remove('hidden');
-            document.getElementById('current-file-name').textContent = fileName;
-            
-            const viewer = document.getElementById('markdown-viewer');
-            viewer.innerHTML = `<p class="text-center py-10 text-slate-400">読み込み中...</p>`;
-
-            try {
-                // ファイル内容を取得
-                const contentRes = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/content`, {
-                    headers: { "Authorization": `Bearer ${accessToken}` }
-                });
-                const markdownText = await contentRes.text();
-                viewer.innerHTML = marked.parse(markdownText);
-
-                // 保存されていたスクロール位置を復元
-                if (readingProgress[fileId]) {
-                    viewer.scrollTop = readingProgress[fileId];
-                }
-
-                // スクロール位置の変化を監視して保存
-                viewer.onscroll = () => {
-                    clearTimeout(window.saveTimeout);
-                    window.saveTimeout = setTimeout(() => saveProgress(fileId, viewer.scrollTop), 1000);
-                };
-            } catch (err) {
-                console.error(err);
-                viewer.innerHTML = `<p class="text-red-500">ファイルの読み込みに失敗しました。</p>`;
-            }
-        }
-
-        async function saveProgress(fileId, scrollTop) {
-            readingProgress[fileId] = scrollTop;
-            document.getElementById('sync-status').textContent = "同期中...";
-            try {
-                // OneDrive上の `reading-progress.json` を更新
-                await callGraphAPI(`/me/drive/root:/reading-progress.json:/content`, "PUT", readingProgress);
-                document.getElementById('sync-status').textContent = "同期済み";
-            } catch (err) {
-                console.error(err);
-                document.getElementById('sync-status').textContent = "同期失敗";
-            }
-        }
-    </script>
-</body>
-</html>
+                    const div = document.createElement('div
