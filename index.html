@@ -17,11 +17,10 @@
     <header class="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shadow-sm">
         <div class="flex items-center gap-2">
             <h1 class="text-lg font-bold text-slate-700">📖 OneDrive Markdown Reader</h1>
-            <!-- バージョン表示バッジ -->
-            <span class="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2 py-0.5 rounded-full border border-emerald-300">v1.1.0</span>
+            <span class="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2 py-0.5 rounded-full border border-emerald-300">v1.1.1</span>
         </div>
         <div id="auth-section">
-            <button id="login-btn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
+            <button id="login-btn" onclick="triggerLogin()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
                 Microsoft ログイン
             </button>
         </div>
@@ -36,7 +35,7 @@
                 <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">検索対象フォルダ</h2>
                 <div class="flex gap-2">
                     <input id="target-folder" type="text" placeholder="例: Documents/デスクトップ/yt分析/channels" class="flex-1 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500">
-                    <button id="update-folder-btn" type="button" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-1 rounded text-xs transition cursor-pointer">更新</button>
+                    <button onclick="triggerFolderUpdate()" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-1 rounded text-xs transition cursor-pointer">更新</button>
                 </div>
                 <p class="text-[10px] text-slate-400 mt-1">※空欄でルート全体。サブフォルダ内も再帰検索します。</p>
             </div>
@@ -78,7 +77,7 @@
         const msalConfig = {
             auth: {
                 clientId: CLIENT_ID,
-                redirectUri: window.location.origin + window.location.pathname.replace(/\/[^\/]*\$/, '/'),
+                redirectUri: window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/'),
             }
         };
 
@@ -87,10 +86,41 @@
         let currentFileId = null;
         let readingProgress = {};
 
+        // ボタンから直接呼び出せる関数
+        window.triggerLogin = async function() {
+            console.log("ログインボタンが押下されました。");
+            if (!msalInstance) {
+                alert("認証ライブラリが初期化中です。数秒待ってから再度クリックしてください。");
+                return;
+            }
+            try {
+                console.log("リダイレクト処理を開始します...");
+                await msalInstance.loginRedirect({
+                    scopes: ["User.Read", "Files.ReadWrite"]
+                });
+            } catch (err) {
+                console.error("ログイン実行エラー:", err);
+                alert("ログイン処理に失敗しました。詳細はコンソールをご確認ください。");
+            }
+        };
+
+        window.triggerFolderUpdate = function() {
+            const folderInputEl = document.getElementById('target-folder');
+            if (folderInputEl) {
+                const val = folderInputEl.value.trim();
+                localStorage.setItem('md_reader_target_folder', val);
+            }
+            if (accessToken) {
+                loadFilesAndProgress();
+            } else {
+                alert("先にMicrosoftログインを行ってください。");
+            }
+        };
+
         async function initMsal() {
             try {
                 if (typeof msal === 'undefined') {
-                    throw new Error("MSAL library is not loaded.");
+                    throw new Error("MSALライブラリがロードされていません。");
                 }
                 msalInstance = new msal.PublicClientApplication(msalConfig);
                 await msalInstance.initialize();
@@ -102,32 +132,21 @@
                 } else {
                     const accounts = msalInstance.getAllAccounts();
                     if (accounts.length > 0) {
-                        const silentRes = await msalInstance.acquireTokenSilent({
-                            scopes: ["User.Read", "Files.ReadWrite"],
-                            account: accounts[0]
-                        });
-                        accessToken = silentRes.accessToken;
-                        onLoginSuccess();
+                        try {
+                            const silentRes = await msalInstance.acquireTokenSilent({
+                                scopes: ["User.Read", "Files.ReadWrite"],
+                                account: accounts[0]
+                            });
+                            accessToken = silentRes.accessToken;
+                            onLoginSuccess();
+                        } catch (silentErr) {
+                            console.warn("サイレントトークン取得失敗 (再ログインが必要):", silentErr);
+                        }
                     }
                 }
                 console.log("MSAL Initialized successfully.");
             } catch (err) {
                 console.error("MSAL Initialization Error:", err);
-            }
-        }
-
-        async function handleLogin() {
-            if (!msalInstance) {
-                alert("認証システムを準備中です。数秒待ってから再度お試しください。");
-                return;
-            }
-            try {
-                await msalInstance.loginRedirect({
-                    scopes: ["User.Read", "Files.ReadWrite"]
-                });
-            } catch (err) {
-                console.error(err);
-                alert("ログインに失敗しました。");
             }
         }
 
@@ -137,19 +156,6 @@
                 authSec.innerHTML = `<span class="text-sm text-green-600 font-medium">ログイン中</span>`;
             }
             loadFilesAndProgress();
-        }
-
-        function handleFolderUpdate() {
-            const folderInputEl = document.getElementById('target-folder');
-            if (folderInputEl) {
-                const val = folderInputEl.value.trim();
-                localStorage.setItem('md_reader_target_folder', val);
-            }
-            if (accessToken) {
-                loadFilesAndProgress();
-            } else {
-                alert("先にMicrosoftログインを行ってください。");
-            }
         }
 
         async function callGraphAPI(endpoint, method = "GET", body = null) {
@@ -201,7 +207,7 @@
                 readingProgress = progressRes || {};
 
                 const folderInputEl = document.getElementById('target-folder');
-                let folderInput = folderInputEl ? folderInputEl.value.trim().replace(/^\/+|\/+\$/g, '') : "";
+                let folderInput = folderInputEl ? folderInputEl.value.trim().replace(/^\/+|\/+$/g, '') : "";
                 
                 let startEndpoint = "/me/drive/root/children";
                 if (folderInput) {
@@ -278,7 +284,14 @@
             }
         }
 
-        window.addEventListener('DOMContentLoaded', () => {
+        // 初期化処理の開始
+        document.addEventListener('DOMContentLoaded', () => {
             const folderInputEl = document.getElementById('target-folder');
             if (folderInputEl) {
-                folderInput
+                folderInputEl.value = localStorage.getItem('md_reader_target_folder') || "Documents/デスクトップ/yt分析/channels";
+            }
+            initMsal();
+        });
+    </script>
+</body>
+</html>
