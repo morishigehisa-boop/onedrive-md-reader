@@ -17,7 +17,7 @@
     <header class="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shadow-sm">
         <h1 class="text-lg font-bold text-slate-700">📖 OneDrive Markdown Reader</h1>
         <div id="auth-section">
-            <button id="login-btn" onclick="login()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            <button id="login-btn" onclick="window.login()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
                 Microsoft ログイン
             </button>
         </div>
@@ -77,9 +77,10 @@
         }
         initMsal();
 
+        // グローバルに関数を登録して確実に呼び出せるようにする
         window.login = async function() {
             if (!msalInstance) {
-                alert("認証システムの初期化中です。しばらく待ってから再度お試しください。");
+                alert("認証システムの初期化中です。数秒待ってから再度お試しください。");
                 return;
             }
             try {
