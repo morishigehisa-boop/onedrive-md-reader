@@ -8,8 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Marked.js for Markdown Rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.js"></script>
-    <!-- Microsoft Graph SDK (Browser Auth) -->
-    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+    <!-- Microsoft Graph SDK (Browser Auth via jsDelivr for stability) -->
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
@@ -68,6 +68,9 @@
         // MSALの初期化
         async function initMsal() {
             try {
+                if (typeof msal === 'undefined') {
+                    throw new Error("MSAL library is not loaded.");
+                }
                 msalInstance = new msal.PublicClientApplication(msalConfig);
                 await msalInstance.initialize();
                 console.log("MSAL Initialized successfully.");
@@ -77,7 +80,7 @@
         }
         initMsal();
 
-        // グローバルに関数を登録して確実に呼び出せるようにする
+        // グローバルに関数を登録
         window.login = async function() {
             if (!msalInstance) {
                 alert("認証システムの初期化中です。数秒待ってから再度お試しください。");
