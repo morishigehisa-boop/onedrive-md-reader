@@ -87,11 +87,12 @@
     <header class="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shadow-sm">
         <div class="flex items-center gap-2">
             <h1 class="text-lg font-bold text-slate-700">📖 OneDrive Markdown Reader</h1>
-            <!-- オレンジバッジ -->
-            <span class="bg-orange-100 text-orange-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-orange-300">v2.4.0</span>
+            <!-- レッドバッジ -->
+            <span class="bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-red-300">v2.5.0</span>
         </div>
         <div id="auth-section">
-            <button id="login-btn" type="button" onclick="window.handleLogin()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
+            <!-- onclick属性を削除 -->
+            <button id="login-btn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
                 Microsoft ログイン
             </button>
         </div>
@@ -105,8 +106,9 @@
             <div class="mb-3">
                 <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">ファイル名検索</h2>
                 <div class="flex gap-2">
-                    <input id="target-filter" type="text" placeholder="例: bukken_notes.md" class="flex-1 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-orange-500">
-                    <button id="search-btn" type="button" onclick="window.handleSearch()" class="bg-orange-600 hover:bg-orange-700 text-white px-2.5 py-1 rounded text-xs transition cursor-pointer">検索</button>
+                    <input id="target-filter" type="text" placeholder="例: bukken_notes.md" class="flex-1 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-red-500">
+                    <!-- onclick属性を削除 -->
+                    <button id="search-btn" type="button" class="bg-red-600 hover:bg-red-700 text-white px-2.5 py-1 rounded text-xs transition cursor-pointer">検索</button>
                 </div>
                 <p class="text-[10px] text-slate-400 mt-1">※ファイルの一部を入力するだけで全件から探します</p>
             </div>
@@ -151,7 +153,7 @@
         let readingProgress = {};
         let scrollTimeout = null;
 
-        window.handleLogin = async function() {
+        async function handleLogin() {
             if (!msalInstance) {
                 alert("認証ライブラリが初期化中です。数秒待ってから再度クリックしてください。");
                 return;
@@ -162,9 +164,9 @@
                 console.error("ログイン実行エラー:", err);
                 alert("ログイン処理に失敗しました。");
             }
-        };
+        }
 
-        window.handleSearch = function() {
+        function handleSearch() {
             const filterInputEl = document.getElementById('target-filter');
             if (filterInputEl) localStorage.setItem('md_reader_filter', filterInputEl.value.trim());
             if (accessToken) {
@@ -172,7 +174,7 @@
             } else {
                 alert("先にMicrosoftログインを行ってください。");
             }
-        };
+        }
 
         async function initMsal() {
             try {
@@ -223,7 +225,7 @@
         async function loadFilesAndProgress() {
             const fileListEl = document.getElementById('file-list');
             const fileCountEl = document.getElementById('file-count');
-            // 全件取得するため少し時間がかかる可能性がある旨を表示
+            
             fileListEl.innerHTML = `<p class="text-slate-400 text-center py-6 text-xs">OneDrive全体をスキャン中...<br>ファイルが多い場合は数秒かかります。</p>`;
 
             try {
@@ -234,12 +236,10 @@
                 const filterWord = (filterInputEl ? filterInputEl.value : "").trim().toLowerCase();
                 
                 let mdFiles = [];
-                // APIのページネーション（続きのデータ）を処理するためのループ変数
                 let nextLink = "/me/drive/root/search(q='.md')?\$top=200";
                 
                 while (nextLink) {
                     let searchRes;
-                    // nextLinkが絶対URLの場合は直接fetch、相対パスの場合はcallGraphAPIを使う
                     if (nextLink.startsWith('http')) {
                         const response = await fetch(nextLink, {
                             headers: { "Authorization": `Bearer ${accessToken}` }
@@ -259,4 +259,100 @@
                                     relPath = decodeURIComponent(f.parentReference.path.replace(/^\/drive\/root:/, '')) + '/' + f.name;
                                     relPath = relPath.replace(/^\/+/, '');
                                 }
-                                return { id: f
+                                return { id: f.id, name: f.name, path: relPath };
+                            });
+                        mdFiles = mdFiles.concat(chunk);
+                        
+                        nextLink = searchRes['@odata.nextLink'] || null;
+                    } else {
+                        break;
+                    }
+                }
+
+                if (filterWord) {
+                    mdFiles = mdFiles.filter(f => f.path.toLowerCase().includes(filterWord) || f.name.toLowerCase().includes(filterWord));
+                }
+
+                fileCountEl.textContent = `${mdFiles.length} 件`;
+                fileListEl.innerHTML = "";
+
+                if (mdFiles.length === 0) {
+                    fileListEl.innerHTML = `<div class="text-center py-6 px-2 text-xs text-slate-400"><p class="font-semibold text-slate-500 mb-1">見つかりませんでした</p></div>`;
+                    return;
+                }
+
+                mdFiles.sort((a, b) => a.name.localeCompare(b.name));
+
+                mdFiles.forEach(file => {
+                    const itemBtn = document.createElement('div');
+                    itemBtn.className = "p-2 rounded-lg hover:bg-slate-100 cursor-pointer transition border border-transparent hover:border-slate-200";
+                    itemBtn.innerHTML = `
+                        <div class="font-medium text-slate-700 truncate text-xs">${file.name}</div>
+                        <div class="text-[10px] text-slate-400 truncate mt-0.5" title="${file.path}">${file.path}</div>
+                    `;
+                    itemBtn.onclick = () => openFile(file.id, file.name, file.path);
+                    fileListEl.appendChild(itemBtn);
+                });
+
+                if (mdFiles.length === 1) {
+                    openFile(mdFiles[0].id, mdFiles[0].name, mdFiles[0].path);
+                }
+
+            } catch (err) {
+                console.error(err);
+                fileListEl.innerHTML = `<p class="text-red-500 text-center py-6 text-xs">ファイルの取得に失敗しました。</p>`;
+            }
+        }
+
+        async function openFile(fileId, fileName, filePath) {
+            currentFileId = fileId;
+            document.getElementById('viewer-header').classList.remove('hidden');
+            document.getElementById('current-file-name').textContent = fileName;
+            document.getElementById('current-file-path').textContent = filePath;
+            
+            const viewer = document.getElementById('markdown-viewer');
+            viewer.innerHTML = `<p class="text-center py-10 text-slate-400 text-sm">読み込み中...</p>`;
+
+            try {
+                const itemMeta = await callGraphAPI(`/me/drive/items/${fileId}`);
+                const downloadUrl = itemMeta['@microsoft.graph.downloadUrl'];
+
+                if (!downloadUrl) throw new Error("URL取得失敗");
+
+                const contentRes = await fetch(downloadUrl);
+                if (!contentRes.ok) throw new Error("本文取得失敗");
+                
+                const markdownText = await contentRes.text();
+                viewer.innerHTML = marked.parse(markdownText);
+
+                if (readingProgress[fileId]) viewer.scrollTop = readingProgress[fileId];
+
+                viewer.onscroll = () => {
+                    clearTimeout(scrollTimeout);
+                    scrollTimeout = setTimeout(() => saveProgress(fileId, viewer.scrollTop), 1000);
+                };
+            } catch (err) {
+                console.error("ファイル展開エラー:", err);
+                viewer.innerHTML = `<p class="text-center text-red-500 text-sm mt-10">読み込みに失敗しました。</p>`;
+            }
+        }
+
+        async function saveProgress(fileId, scrollTop) {
+            readingProgress[fileId] = scrollTop;
+            document.getElementById('sync-status').textContent = "同期中...";
+            try {
+                await callGraphAPI(`/me/drive/root:/reading-progress.json:/content`, "PUT", readingProgress);
+                document.getElementById('sync-status').textContent = "同期済み";
+            } catch (err) {
+                document.getElementById('sync-status').textContent = "同期失敗";
+            }
+        }
+
+        // 完全に安全なイベントリスナーの登録（DOMが読み込まれた後）
+        document.addEventListener('DOMContentLoaded', () => {
+            const filterInputEl = document.getElementById('target-filter');
+            if (filterInputEl) filterInputEl.value = localStorage.getItem('md_reader_filter') || "";
+
+            // ログインボタンの紐付け
+            const loginBtn = document.getElementById('login-btn');
+            if (loginBtn) {
