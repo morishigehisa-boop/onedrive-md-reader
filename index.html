@@ -17,7 +17,7 @@
     <header class="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shadow-sm">
         <h1 class="text-lg font-bold text-slate-700">📖 OneDrive Markdown Reader</h1>
         <div id="auth-section">
-            <button id="login-btn" onclick="login()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            <button id="login-btn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
                 Microsoft ログイン
             </button>
         </div>
@@ -32,7 +32,7 @@
                 <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">検索対象フォルダ</h2>
                 <div class="flex gap-2">
                     <input id="target-folder" type="text" placeholder="例: Documents/デスクトップ/yt分析/channels" class="flex-1 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500">
-                    <button onclick="changeFolderAndReload()" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-1 rounded text-xs transition">更新</button>
+                    <button id="update-folder-btn" type="button" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-1 rounded text-xs transition cursor-pointer">更新</button>
                 </div>
                 <p class="text-[10px] text-slate-400 mt-1">※空欄でルート全体。サブフォルダ内も再帰検索します。</p>
             </div>
@@ -50,7 +50,7 @@
         </aside>
 
         <!-- Content Area: Markdown Viewer -->
-        <section class="md:col-span-3 bg-white rounded-xl shadow-lg border border-slate-200 p-6 flex flex-col h-[75vh] md:h-[calc(100vh-8rem)]">
+        <section class="md:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col h-[75vh] md:h-[calc(100vh-8rem)]">
             <div id="viewer-header" class="border-b pb-3 mb-4 flex justify-between items-center hidden">
                 <div>
                     <span id="current-file-name" class="font-bold text-slate-700 text-base">ファイル未選択</span>
@@ -83,10 +83,38 @@
         let currentFileId = null;
         let readingProgress = {};
 
-        // グローバル関数の先行定義
-        window.login = async function() {
+        async function initMsal() {
+            try {
+                if (typeof msal === 'undefined') {
+                    throw new Error("MSAL library is not loaded.");
+                }
+                msalInstance = new msal.PublicClientApplication(msalConfig);
+                await msalInstance.initialize();
+
+                const response = await msalInstance.handleRedirectPromise();
+                if (response) {
+                    accessToken = response.accessToken;
+                    onLoginSuccess();
+                } else {
+                    const accounts = msalInstance.getAllAccounts();
+                    if (accounts.length > 0) {
+                        const silentRes = await msalInstance.acquireTokenSilent({
+                            scopes: ["User.Read", "Files.ReadWrite"],
+                            account: accounts[0]
+                        });
+                        accessToken = silentRes.accessToken;
+                        onLoginSuccess();
+                    }
+                }
+                console.log("MSAL Initialized successfully.");
+            } catch (err) {
+                console.error("MSAL Initialization Error:", err);
+            }
+        }
+
+        async function handleLogin() {
             if (!msalInstance) {
-                alert("認証システムの初期化中です。数秒待ってから再度お試しください。");
+                alert("認証システムを準備中です。数秒待ってから再度お試しください。");
                 return;
             }
             try {
@@ -97,8 +125,11 @@
                 console.error(err);
                 alert("ログインに失敗しました。");
             }
-        };
+        }
 
-        window.changeFolderAndReload = function() {
-            const folderInputEl = document.getElementById('target-folder');
-            if
+        function onLoginSuccess() {
+            const authSec = document.getElementById('auth-section');
+            if (authSec) {
+                authSec.innerHTML = `<span class="text-sm text-green-600 font-medium">ログイン中</span>`;
+            }
+            loadFilesAndProgress();
