@@ -6,7 +6,7 @@
     <title>OneDrive Markdown Reader</title>
     <!-- Tailwind CSS for Responsive UI -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Marked.js for Markdown Rendering (バージョン指定の安定版に変更) -->
+    <!-- Marked.js for Markdown Rendering -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
     <!-- Microsoft Graph SDK (Browser Auth via jsDelivr) -->
     <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
@@ -17,11 +17,12 @@
     <header class="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shadow-sm">
         <div class="flex items-center gap-2">
             <h1 class="text-lg font-bold text-slate-700">📖 OneDrive Markdown Reader</h1>
-            <!-- 視覚的に更新がわかるライム(黄緑)バッジ -->
-            <span class="bg-lime-100 text-lime-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-lime-300">v1.9.0</span>
+            <!-- 視覚的に更新がわかるイエロー(黄色)バッジ -->
+            <span class="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-yellow-400">v2.0.0</span>
         </div>
         <div id="auth-section">
-            <button id="login-btn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
+            <!-- 確実なインライン onclick 呼び出しを復活 -->
+            <button id="login-btn" type="button" onclick="window.handleLogin()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
                 Microsoft ログイン
             </button>
         </div>
@@ -36,7 +37,7 @@
                 <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">ファイル絞り込み</h2>
                 <div class="flex gap-2">
                     <input id="target-filter" type="text" placeholder="例: channels または 空欄" class="flex-1 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500">
-                    <button id="search-btn" type="button" class="bg-lime-600 hover:bg-lime-700 text-white px-2.5 py-1 rounded text-xs transition cursor-pointer">検索</button>
+                    <button id="search-btn" type="button" onclick="window.handleSearch()" class="bg-yellow-600 hover:bg-yellow-700 text-white px-2.5 py-1 rounded text-xs transition cursor-pointer">検索</button>
                 </div>
                 <p class="text-[10px] text-slate-400 mt-1">※OneDrive全体から.mdファイルを検索</p>
             </div>
@@ -74,7 +75,7 @@
     <!-- Script Logic -->
     <script>
         const CLIENT_ID = "3c6cf6bf-6af7-4bd0-ad41-cca85929f8b6";
-        const cleanRedirectUri = window.location.origin + window.location.pathname.replace(/\/[^\/]*\$/, '/');
+        const cleanRedirectUri = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/');
         const msalConfig = { auth: { clientId: CLIENT_ID, redirectUri: cleanRedirectUri } };
 
         let msalInstance = null;
@@ -82,6 +83,32 @@
         let currentFileId = null;
         let readingProgress = {};
         let scrollTimeout = null;
+
+        // グローバルに直接関数を登録（onclickで確実に呼ぶため）
+        window.handleLogin = async function() {
+            if (!msalInstance) {
+                alert("認証ライブラリが初期化中です。数秒待ってから再度クリックしてください。");
+                return;
+            }
+            try {
+                await msalInstance.loginRedirect({ scopes: ["User.Read", "Files.ReadWrite"] });
+            } catch (err) {
+                console.error("ログイン実行エラー:", err);
+                alert("ログイン処理に失敗しました。");
+            }
+        };
+
+        window.handleSearch = function() {
+            const filterInputEl = document.getElementById('target-filter');
+            if (filterInputEl) {
+                localStorage.setItem('md_reader_filter', filterInputEl.value.trim());
+            }
+            if (accessToken) {
+                loadFilesAndProgress();
+            } else {
+                alert("先にMicrosoftログインを行ってください。");
+            }
+        };
 
         async function initMsal() {
             try {
@@ -110,31 +137,6 @@
                 }
             } catch (err) {
                 console.error("MSAL Initialization Error:", err);
-            }
-        }
-
-        async function handleLogin() {
-            if (!msalInstance) {
-                alert("認証ライブラリが初期化中です。数秒待ってから再度クリックしてください。");
-                return;
-            }
-            try {
-                await msalInstance.loginRedirect({ scopes: ["User.Read", "Files.ReadWrite"] });
-            } catch (err) {
-                console.error("ログイン実行エラー:", err);
-                alert("ログイン処理に失敗しました。");
-            }
-        }
-
-        function handleSearch() {
-            const filterInputEl = document.getElementById('target-filter');
-            if (filterInputEl) {
-                localStorage.setItem('md_reader_filter', filterInputEl.value.trim());
-            }
-            if (accessToken) {
-                loadFilesAndProgress();
-            } else {
-                alert("先にMicrosoftログインを行ってください。");
             }
         }
 
@@ -233,7 +235,7 @@
                 if (!contentRes.ok) throw new Error("本文取得失敗");
                 
                 const markdownText = await contentRes.text();
-                // marked.js を使ってMarkdownをHTMLに変換して表示
+                // v1.9.0で修正した安定版markedを使用
                 viewer.innerHTML = marked.parse(markdownText);
 
                 if (readingProgress[fileId]) viewer.scrollTop = readingProgress[fileId];
@@ -262,9 +264,9 @@
         document.addEventListener('DOMContentLoaded', () => {
             const filterInputEl = document.getElementById('target-filter');
             if (filterInputEl) filterInputEl.value = localStorage.getItem('md_reader_filter') || "channels";
-
-            const loginBtn = document.getElementById('login-btn');
-            if (loginBtn) loginBtn.addEventListener('click', handleLogin);
-
-            const searchBtn = document.getElementById('search-btn');
-            if (searchBtn) searchBtn.addEventListener('click', handleSearch);
+            // ボタンへのaddEventListenerは削除し、onclick属性に統一
+            initMsal();
+        });
+    </script>
+</body>
+</html>
