@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneDrive Markdown Reader</title>
+    <!-- Tailwind CSS for Responsive UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Marked.js for Markdown Rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.js"></script>
+    <!-- Microsoft Graph SDK (Browser Auth) -->
+    <script src="https://alcdn.msftauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shadow-sm">
+        <h1 class="text-lg font-bold text-slate-700">📖 OneDrive Markdown Reader</h1>
+        <div id="auth-section">
+            <button id="login-btn" onclick="login()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                Microsoft ログイン
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Container (Responsive Layout: Mobile stacks, Desktop side-by-side) -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+        
+        <!-- Sidebar: File List -->
+        <aside class="md:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[70vh] md:h-[calc(100vh-8rem)]">
+            <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">OneDrive ファイル</h2>
+            <div id="file-list" class="overflow-y-auto flex-1 space-y-2 text-sm">
+                <p class="text-slate-400 text-center py-8">ログインしてファイルを読み込んでください。</p>
+            </div>
+        </aside>
+
+        <!-- Content Area: Markdown Viewer -->
+        <section class="md:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col h-[75vh] md:h-[calc(100vh-8rem)]">
+            <div id="viewer-header" class="border-b pb-3 mb-4 flex justify-between items-center hidden">
+                <span id="current-file-name" class="font-bold text-slate-700">ファイル未選択</span>
+                <span id="sync-status" class="text-xs text-slate-400">同期済み</span>
+            </div>
+            <div id="markdown-viewer" class="overflow-y-auto flex-1 prose max-w-none text-slate-700 leading-relaxed pr-2">
+                <div class="text-center py-20 text-slate-400">
+                    <p class="text-lg mb-2">左側のリストからMarkdownファイルを選択してください。</p>
+                    <p class="text-xs">どの端末から読んでも、前回のスクロール位置が自動で同期されます。</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Script Logic -->
+    <script>
+        // Azureで取得したクライアントID
+        const CLIENT_ID = "3c6cf6bf-6af7-4bd0-ad41-cca85929f8b6";
+        
+        const msalConfig = {
+            auth: {
+                clientId: CLIENT_ID,
+                redirectUri: window.location.origin,
+            }
+        };
+
+        const msalInstance = new msal.PublicClientApplication(msalConfig);
+        let accessToken = null;
+        let currentFileId = null;
+        let readingProgress = {};
+
+        async function login() {
+            try {
+                const loginResponse = await msalInstance.loginPopup({
+                    scopes: ["User.Read", "Files.ReadWrite"]
+                });
+                accessToken = loginResponse.accessToken;
+                document.getElementById('auth-section').innerHTML = `<span class="text-sm text-green-600 font-medium">ログイン中</span>`;
+                loadFilesAndProgress();
+            } catch (err) {
+                console.error(err);
+                alert("ログインに失敗しました。");
+            }
+        }
+
+        async function callGraphAPI(endpoint, method = "GET", body = null) {
+            const headers = new Headers();
+            headers.append("Authorization", `Bearer ${accessToken}`);
+            if (body) headers.append("Content-Type", "application/json");
+
+            const options = { method, headers };
+            if (body) options.body = JSON.stringify(body);
+
+            const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, options);
+            if (!response.ok && response.status !== 404) throw new Error("Graph API Error");
+            return response.status === 404 ? null : await response.json();
+        }
+
+        async function loadFilesAndProgress() {
+            try {
+                // 1. 既読位置JSONデータの読み込み（なければ空オブジェクト）
+                const progressRes = await callGraphAPI("/me/drive/root:/reading-progress.json:/content");
+                readingProgress = progressRes || {};
+
+                // 2. OneDrive上のMarkdownファイル一覧を取得
+                const filesRes = await callGraphAPI("/me/drive/root/children");
+                const fileListEl = document.getElementById('file-list');
+                fileListEl.innerHTML = "";
+
+                const mdFiles = filesRes.value.filter(f => f.name.endsWith('.md'));
+                if (mdFiles.length === 0) {
+                    fileListEl.innerHTML = `<p class="text-slate-400 text-center py-4">OneDriveに .md ファイルが見つかりません。</p>`;
+                    return;
+                }
+
+                mdFiles.forEach(file => {
+                    const div = document.createElement('div');
+                    div.className = "p-2 rounded-lg hover:bg-slate-100 cursor-pointer truncate transition";
+                    div.textContent = file.name;
+                    div.onclick = () => openFile(file.id, file.name);
+                    fileListEl.appendChild(div);
+                });
+            } catch (err) {
+                console.error(err);
+                alert("ファイル一覧の取得に失敗しました。");
+            }
+        }
+
+        async function openFile(fileId, fileName) {
+            currentFileId = fileId;
+            document.getElementById('viewer-header').classList.remove('hidden');
+            document.getElementById('current-file-name').textContent = fileName;
+            
+            const viewer = document.getElementById('markdown-viewer');
+            viewer.innerHTML = `<p class="text-center py-10 text-slate-400">読み込み中...</p>`;
+
+            try {
+                // ファイル内容を取得
+                const contentRes = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/content`, {
+                    headers: { "Authorization": `Bearer ${accessToken}` }
+                });
+                const markdownText = await contentRes.text();
+                viewer.innerHTML = marked.parse(markdownText);
+
+                // 保存されていたスクロール位置を復元
+                if (readingProgress[fileId]) {
+                    viewer.scrollTop = readingProgress[fileId];
+                }
+
+                // スクロール位置の変化を監視して保存
+                viewer.onscroll = () => {
+                    clearTimeout(window.saveTimeout);
+                    window.saveTimeout = setTimeout(() => saveProgress(fileId, viewer.scrollTop), 1000);
+                };
+            } catch (err) {
+                console.error(err);
+                viewer.innerHTML = `<p class="text-red-500">ファイルの読み込みに失敗しました。</p>`;
+            }
+        }
+
+        async function saveProgress(fileId, scrollTop) {
+            readingProgress[fileId] = scrollTop;
+            document.getElementById('sync-status').textContent = "同期中...";
+            try {
+                // OneDrive上の `reading-progress.json` を更新
+                await callGraphAPI(`/me/drive/root:/reading-progress.json:/content`, "PUT", readingProgress);
+                document.getElementById('sync-status').textContent = "同期済み";
+            } catch (err) {
+                console.error(err);
+                document.getElementById('sync-status').textContent = "同期失敗";
+            }
+        }
+    </script>
+</body>
+</html>
