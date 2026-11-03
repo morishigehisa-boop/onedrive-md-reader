@@ -83,31 +83,28 @@
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
-    <!-- Header -->
     <header class="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shadow-sm">
         <div class="flex items-center gap-2">
             <h1 class="text-lg font-bold text-slate-700">📖 OneDrive Markdown Reader</h1>
-            <!-- パープルバッジ -->
-            <span class="bg-purple-100 text-purple-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-purple-300">v2.6.0</span>
+            <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-blue-300">v2.7.0</span>
         </div>
         <div id="auth-section">
-            <!-- 確実に反応する onclick 属性に変更 -->
-            <button id="login-btn" type="button" onclick="executeLogin()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
+            <!-- HTMLからのonclick属性を完全削除 -->
+            <button id="login-btn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
                 Microsoft ログイン
             </button>
         </div>
     </header>
 
-    <!-- Main Container -->
     <main class="flex-1 w-full px-2 py-4 md:px-4 md:py-6 flex flex-col md:flex-row gap-4 md:gap-6 items-stretch">
         
-        <!-- Sidebar -->
         <aside style="resize: horizontal;" class="overflow-hidden w-full md:w-80 md:min-w-[16rem] flex-shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[70vh] md:h-[calc(100vh-8rem)] relative">
             <div class="mb-3">
                 <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">ファイル名検索</h2>
                 <div class="flex gap-2">
-                    <input id="target-filter" type="text" placeholder="例: bukken_notes.md" class="flex-1 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-500">
-                    <button id="search-btn" type="button" onclick="executeSearch()" class="bg-purple-600 hover:bg-purple-700 text-white px-2.5 py-1 rounded text-xs transition cursor-pointer">検索</button>
+                    <input id="target-filter" type="text" placeholder="例: bukken_notes.md" class="flex-1 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500">
+                    <!-- HTMLからのonclick属性を完全削除 -->
+                    <button id="search-btn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded text-xs transition cursor-pointer">検索</button>
                 </div>
                 <p class="text-[10px] text-slate-400 mt-1">※ファイルの一部を入力するだけで全件から探します</p>
             </div>
@@ -117,4 +114,113 @@
                 <span id="file-count" class="text-xs text-slate-400">0 件</span>
             </div>
             <div id="file-list" class="overflow-y-auto flex-1 space-y-1.5 text-sm pb-4">
-                <p class="text-slate-400 text-center py-8 text
+                <p class="text-slate-400 text-center py-8 text-xs">ログインしてファイルを読み込んでください。</p>
+            </div>
+        </aside>
+
+        <section style="resize: horizontal;" class="overflow-hidden flex-1 min-w-[300px] bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col h-[75vh] md:h-[calc(100vh-8rem)] relative">
+            <div id="viewer-header" class="border-b pb-3 mb-4 flex justify-between items-center hidden">
+                <div class="min-w-0 flex-1 pr-4">
+                    <span id="current-file-name" class="font-bold text-slate-700 text-base truncate block">ファイル未選択</span>
+                    <span id="current-file-path" class="text-xs text-slate-400 mt-0.5 truncate block"></span>
+                </div>
+                <span id="sync-status" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded flex-shrink-0">同期済み</span>
+            </div>
+            
+            <div id="markdown-viewer" class="overflow-y-auto flex-1 pr-2">
+                <div class="text-center py-20 text-slate-400">
+                    <p class="text-lg mb-2">左側のリストからファイルを選択してください。</p>
+                    <p class="text-xs">どの端末から読んでもスクロール位置が自動同期されます。</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const CLIENT_ID = "3c6cf6bf-6af7-4bd0-ad41-cca85929f8b6";
+        const cleanRedirectUri = window.location.origin + window.location.pathname.replace(/\/[^\/]*\$/, '/');
+        const msalConfig = { auth: { clientId: CLIENT_ID, redirectUri: cleanRedirectUri } };
+
+        let msalInstance = null;
+        let accessToken = null;
+        let currentFileId = null;
+        let readingProgress = {};
+        let scrollTimeout = null;
+
+        async function initMsal() {
+            try {
+                if (typeof msal === 'undefined') throw new Error("MSALライブラリがロードされていません。");
+                msalInstance = new msal.PublicClientApplication(msalConfig);
+                await msalInstance.initialize();
+
+                const response = await msalInstance.handleRedirectPromise();
+                if (response) {
+                    accessToken = response.accessToken;
+                    onLoginSuccess();
+                } else {
+                    const accounts = msalInstance.getAllAccounts();
+                    if (accounts.length > 0) {
+                        try {
+                            const silentRes = await msalInstance.acquireTokenSilent({ scopes: ["User.Read", "Files.ReadWrite"], account: accounts[0] });
+                            accessToken = silentRes.accessToken;
+                            onLoginSuccess();
+                        } catch (silentErr) {
+                            console.warn("サイレントトークン取得失敗:", silentErr);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("MSAL Initialization Error:", err);
+            }
+        }
+
+        function onLoginSuccess() {
+            const authSec = document.getElementById('auth-section');
+            if (authSec) authSec.innerHTML = `<span class="text-sm text-green-600 font-medium">ログイン中</span>`;
+            loadFilesAndProgress();
+        }
+
+        async function callGraphAPI(endpoint, method = "GET", body = null) {
+            const headers = new Headers();
+            headers.append("Authorization", `Bearer ${accessToken}`);
+            if (body) headers.append("Content-Type", "application/json");
+
+            const options = { method, headers };
+            if (body) options.body = JSON.stringify(body);
+
+            const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, options);
+            if (!response.ok && response.status !== 404) throw new Error(`Graph API Error: ${response.status}`);
+            return response.status === 404 ? null : await response.json();
+        }
+
+        async function loadFilesAndProgress() {
+            const fileListEl = document.getElementById('file-list');
+            const fileCountEl = document.getElementById('file-count');
+            
+            fileListEl.innerHTML = `<p class="text-slate-400 text-center py-6 text-xs">OneDrive全体をスキャン中...<br>ファイルが多い場合は数秒かかります。</p>`;
+
+            try {
+                const progressRes = await callGraphAPI("/me/drive/root:/reading-progress.json:/content");
+                readingProgress = progressRes || {};
+
+                const filterInputEl = document.getElementById('target-filter');
+                const filterWord = (filterInputEl ? filterInputEl.value : "").trim().toLowerCase();
+                
+                let mdFiles = [];
+                let nextLink = "/me/drive/root/search(q='.md')?\$top=200";
+                
+                while (nextLink) {
+                    let searchRes;
+                    if (nextLink.startsWith('http')) {
+                        const response = await fetch(nextLink, {
+                            headers: { "Authorization": `Bearer ${accessToken}` }
+                        });
+                        if (!response.ok) break;
+                        searchRes = await response.json();
+                    } else {
+                        searchRes = await callGraphAPI(nextLink);
+                    }
+                    
+                    if (searchRes && searchRes.value) {
+                        const chunk = searchRes.value
+                            .filter(f => f.file && f
