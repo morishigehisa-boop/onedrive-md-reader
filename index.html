@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OneDrive Markdown Reader v3.4</title>
+<title>OneDrive Markdown Reader v3.5</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
@@ -71,6 +71,11 @@
   body[data-theme="dark"] #markdown-viewer blockquote {background:#1e293b}
   @media(max-width:760px){#toc-panel{width:145px}#reader-layout{gap:.4rem}}
   @media(max-width:520px){#toc-panel{display:none}}
+  /* ファイル一覧ペインを隠したときは閲覧領域を最大化 */
+  #app-main.library-hidden > #library-pane { display:none !important; }
+  #app-main.library-hidden > #viewer-panel { width:100%; height:calc(100vh - 6.5rem) !important; }
+  #library-pane { transition: opacity .15s ease; }
+  #library-pane-toggle { white-space:nowrap; }
   .spinner {width:15px;height:15px;border:2px solid #cbd5e1;border-top-color:#2563eb;border-radius:50%;display:inline-block;animation:spin .8s linear infinite}
   @keyframes spin {to{transform:rotate(360deg)}}
 </style>
@@ -79,7 +84,7 @@
 <header class="bg-white border-b border-slate-200 px-4 py-3 flex flex-wrap gap-3 justify-between items-center shadow-sm">
   <div class="flex items-center gap-2">
     <h1 class="text-lg font-bold text-slate-800">📖 OneDrive Markdown Reader</h1>
-    <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded-full">v3.4</span>
+    <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded-full">v3.5</span>
   </div>
   <div class="flex items-center gap-3">
     <span id="account-label" class="text-xs text-slate-500"></span>
@@ -89,8 +94,8 @@
   </div>
 </header>
 
-<main class="flex-1 w-full p-3 md:p-5 flex flex-col md:flex-row gap-4 min-h-0">
-  <aside class="w-full md:w-96 md:flex-shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[42vh] md:h-[calc(100vh-6.5rem)]">
+<main id="app-main" class="flex-1 w-full p-3 md:p-5 flex flex-col md:flex-row gap-4 min-h-0">
+  <aside id="library-pane" class="w-full md:w-96 md:flex-shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[42vh] md:h-[calc(100vh-6.5rem)]">
     <div class="flex justify-between items-center mb-3">
       <h2 id="list-title" class="text-sm font-bold text-slate-700">登録済み Markdown</h2>
       <button id="sync-btn" class="text-xs text-blue-700 hover:underline disabled:text-slate-400" disabled>同期</button>
@@ -121,7 +126,7 @@
     <button id="more-btn" class="hidden mt-2 w-full border rounded-lg py-2 text-xs hover:bg-slate-50">さらに表示</button>
   </aside>
 
-  <section class="flex-1 min-w-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 flex flex-col h-[55vh] md:h-[calc(100vh-6.5rem)]">
+  <section id="viewer-panel" class="flex-1 min-w-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 flex flex-col h-[55vh] md:h-[calc(100vh-6.5rem)]">
     <div id="viewer-header" class="hidden border-b pb-3 mb-3 flex justify-between gap-3 items-center">
       <div class="min-w-0">
         <div id="current-file-name" class="font-bold text-slate-800 truncate"></div>
@@ -130,6 +135,7 @@
       <span id="progress-status" class="text-xs text-slate-500 whitespace-nowrap">閲覧位置</span>
     </div>
     <div id="reader-toolbar">
+      <button id="library-pane-toggle" type="button" aria-expanded="true" title="ファイル一覧ペインの表示・非表示を切り替え">☰ ファイル一覧を隠す</button>
       <button id="toc-toggle" type="button">☷ 目次</button>
       <label class="text-xs">文字 <select id="font-size-select"><option value="14">小</option><option value="15" selected>標準</option><option value="17">大</option><option value="19">特大</option></select></label>
       <label class="text-xs">行間 <select id="line-height-select"><option value="1.5">狭い</option><option value="1.75">標準</option><option value="2">広い</option><option value="2.2">ゆったり</option></select></label>
@@ -215,7 +221,8 @@ const state = {
   restoringPosition: false,
   annotations: {},
   fullTextCache: new Map(),
-  focusMode: false
+  focusMode: false,
+  libraryHidden: false
 };
 
 function showToast(message, ms = 4500) {
@@ -1177,6 +1184,26 @@ async function searchRegisteredMarkdown(){
 }
 
 /* =========================
+   ファイル一覧ペイン表示設定
+   ========================= */
+function applyLibraryVisibility(hidden, persist = true) {
+  state.libraryHidden = !!hidden;
+  $("app-main").classList.toggle("library-hidden", state.libraryHidden);
+  const btn = $("library-pane-toggle");
+  btn.textContent = state.libraryHidden ? "☰ ファイル一覧を表示" : "☰ ファイル一覧を隠す";
+  btn.setAttribute("aria-expanded", state.libraryHidden ? "false" : "true");
+  btn.title = state.libraryHidden ? "ファイル一覧ペインを再表示" : "ファイル一覧ペインを非表示";
+  if (persist) {
+    try { localStorage.setItem("md_reader_library_hidden", state.libraryHidden ? "1" : "0"); } catch (_) {}
+  }
+}
+function initLibraryVisibility() {
+  let hidden = false;
+  try { hidden = localStorage.getItem("md_reader_library_hidden") === "1"; } catch (_) {}
+  applyLibraryVisibility(hidden, false);
+}
+
+/* =========================
    テーマ設定
    ========================= */
 function applyTheme(theme) {
@@ -1194,6 +1221,12 @@ $("markdown-viewer").addEventListener("wheel", () => { state.lastLocalInteractio
 $("markdown-viewer").addEventListener("touchmove", () => { state.lastLocalInteractionAt = Date.now(); }, { passive: true });
 $("markdown-viewer").addEventListener("keydown", () => { state.lastLocalInteractionAt = Date.now(); });
 $("theme-btn").addEventListener("click", () => applyTheme(state.theme === "dark" ? "light" : "dark"));
+$("library-pane-toggle").addEventListener("click", () => applyLibraryVisibility(!state.libraryHidden));
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "b") {
+    e.preventDefault(); applyLibraryVisibility(!state.libraryHidden);
+  }
+});
 $("toc-toggle").addEventListener("click",()=>$("toc-panel").classList.toggle("hidden"));
 ["font-size-select","line-height-select","content-width-select"].forEach(id=>$(id).addEventListener("change",saveReaderSettings));
 $("focus-toggle").addEventListener("click",()=>{state.focusMode=!state.focusMode;$("markdown-viewer").classList.toggle("focus-mode",state.focusMode);$("toc-panel").classList.toggle("hidden",state.focusMode);$("focus-toggle").textContent=state.focusMode?"通常表示":"集中モード";});
@@ -1237,6 +1270,7 @@ window.addEventListener("beforeunload", () => {
 (async function boot() {
   try {
     initTheme();
+    initLibraryVisibility();
     applyReaderSettings();
     state.db = await openDatabase();
     await initAuth();
