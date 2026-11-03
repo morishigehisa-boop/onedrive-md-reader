@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OneDrive Markdown Reader v3.0</title>
+<title>OneDrive Markdown Reader v3.1</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
@@ -38,7 +38,7 @@
 <header class="bg-white border-b border-slate-200 px-4 py-3 flex flex-wrap gap-3 justify-between items-center shadow-sm">
   <div class="flex items-center gap-2">
     <h1 class="text-lg font-bold text-slate-800">📖 OneDrive Markdown Reader</h1>
-    <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded-full">v3.0</span>
+    <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded-full">v3.1</span>
   </div>
   <div class="flex items-center gap-3">
     <span id="account-label" class="text-xs text-slate-500"></span>
@@ -50,10 +50,14 @@
 <main class="flex-1 w-full p-3 md:p-5 flex flex-col md:flex-row gap-4 min-h-0">
   <aside class="w-full md:w-96 md:flex-shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[42vh] md:h-[calc(100vh-6.5rem)]">
     <div class="flex justify-between items-center mb-3">
-      <h2 class="text-sm font-bold text-slate-700">Markdown ファイル</h2>
-      <button id="sync-btn" class="text-xs text-blue-700 hover:underline disabled:text-slate-400" disabled>一覧を同期</button>
+      <h2 id="list-title" class="text-sm font-bold text-slate-700">登録済み Markdown</h2>
+      <button id="sync-btn" class="text-xs text-blue-700 hover:underline disabled:text-slate-400" disabled>同期</button>
     </div>
-    <input id="filter-input" type="search" placeholder="ファイル名・フォルダ名で検索" class="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full mb-2" disabled>
+    <div class="flex gap-2 mb-2">
+      <button id="show-registered-btn" class="flex-1 rounded-lg border px-2 py-2 text-xs bg-blue-50 border-blue-200 text-blue-700" disabled>登録済み</button>
+      <button id="show-search-btn" class="flex-1 rounded-lg border px-2 py-2 text-xs hover:bg-slate-50" disabled>＋ OneDriveから追加</button>
+    </div>
+    <input id="filter-input" type="search" placeholder="登録済みファイルを絞り込み" class="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full mb-2" disabled>
     <div class="flex justify-between text-xs text-slate-500 mb-2">
       <span id="file-count">0 件</span>
       <span id="sync-time">未同期</span>
@@ -111,7 +115,9 @@ const state = {
   account: null,
   token: null,
   files: [],
+  registeredFiles: [],
   filtered: [],
+  listMode: "registered",
   rendered: 0,
   currentFile: null,
   openRequest: 0,
@@ -120,7 +126,6 @@ const state = {
   saveTimer: null,
   saveChain: Promise.resolve(),
   progress: {},
-  remoteProgressItemId: null,
   db: null,
   syncing: false,
   toastTimer: null
@@ -282,6 +287,8 @@ function setLoggedInUI() {
   $("account-label").textContent = state.account?.username || "ログイン中";
   $("sync-btn").disabled = false;
   $("filter-input").disabled = false;
+  $("show-registered-btn").disabled = false;
+  $("show-search-btn").disabled = false;
 }
 
 /* =========================
@@ -355,7 +362,6 @@ async function syncDrive() {
     let nextUrl = deltaLink || "/me/drive/root/delta?$top=" + CONFIG.PAGE_SIZE;
     let changed = [];
     let deleted = [];
-    let deletedFolders = [];
     let pages = 0;
     let finalDeltaLink = null;
 
@@ -375,7 +381,6 @@ async function syncDrive() {
           nextUrl = "/me/drive/root/delta?$top=" + CONFIG.PAGE_SIZE;
           changed = [];
           deleted = [];
-          deletedFolders = [];
           pages = 0;
           continue;
         }
@@ -383,38 +388,15 @@ async function syncDrive() {
       }
 
       for (const item of (response.value || [])) {
-        if (item.deleted) {
-          deleted.push(item.id);
-          if (item.folder) deletedFolders.push(item.id);
-        } else {
-          changed.push(toStoredItem(item));
-        }
+        if (item.deleted) deleted.push(item.id);
+        else changed.push(toStoredItem(item));
       }
       nextUrl = response["@odata.nextLink"] || null;
       finalDeltaLink = response["@odata.deltaLink"] || finalDeltaLink;
     }
 
     if (changed.length) await idbPutMany("items", changed);
-    if (deleted.length) {
-      // フォルダ削除時、Deltaが子ファイルを個別に返さない場合に備えて
-      // ローカルの親子関係から配下の項目も削除する。
-      const existing = await idbGetAll("items");
-      const byId = new Map(existing.map(x => [x.id, x]));
-      const removeSet = new Set(deleted);
-      const removedFolders = new Set(deletedFolders);
-      for (const item of existing) {
-        let parentId = item.parentId;
-        let guard = 0;
-        while (parentId && guard++ < 100) {
-          if (removedFolders.has(parentId) || removeSet.has(parentId)) {
-            removeSet.add(item.id);
-            break;
-          }
-          parentId = byId.get(parentId)?.parentId || null;
-        }
-      }
-      await idbDeleteMany("items", [...removeSet]);
-    }
+    if (deleted.length) await idbDeleteMany("items", deleted);
     if (finalDeltaLink) await idbSetMeta("deltaLink", finalDeltaLink);
 
     await loadFileIndex();
@@ -458,63 +440,104 @@ async function loadFileIndex() {
 
   state.files = files.map(item => ({ ...item, path: getPath(item) }))
     .sort((a, b) => a.path.localeCompare(b.path, "ja"));
+  refreshRegisteredFiles();
   applyFilter();
 }
 function applyFilter() {
   const q = $("filter-input").value.trim().toLocaleLowerCase();
+  const source = state.listMode === "search" ? state.files : state.registeredFiles;
   state.filtered = q
-    ? state.files.filter(f => f.name.toLocaleLowerCase().includes(q) || f.path.toLocaleLowerCase().includes(q))
-    : state.files.slice();
+    ? source.filter(f => f.name.toLocaleLowerCase().includes(q) || f.path.toLocaleLowerCase().includes(q))
+    : source.slice();
   state.rendered = 0;
   $("file-count").textContent = `${state.filtered.length.toLocaleString("ja-JP")} 件`;
   $("file-list").innerHTML = "";
   renderMoreFiles();
+}
+function setListMode(mode) {
+  state.listMode = mode;
+  const searching = mode === "search";
+  $("list-title").textContent = searching ? "OneDrive内を検索" : "登録済み Markdown";
+  $("show-registered-btn").className = "flex-1 rounded-lg border px-2 py-2 text-xs " + (!searching ? "bg-blue-50 border-blue-200 text-blue-700" : "hover:bg-slate-50");
+  $("show-search-btn").className = "flex-1 rounded-lg border px-2 py-2 text-xs " + (searching ? "bg-blue-50 border-blue-200 text-blue-700" : "hover:bg-slate-50");
+  $("filter-input").placeholder = searching ? "OneDrive内のファイル名・フォルダ名を検索" : "登録済みファイルを絞り込み";
+  $("filter-input").value = "";
+  setListStatus(searching ? "同期済みのOneDrive全体からMarkdownファイルを検索します。未同期の場合は先に同期してください。" : "ここには登録したファイルだけを表示します。登録解除するまで一覧に残ります。");
+  applyFilter();
+}
+async function saveRegistration(file, enabled) {
+  const now = new Date().toISOString();
+  state.progress.__registrations = state.progress.__registrations || {};
+  state.progress.__registrations[file.id] = { enabled, name: file.name, path: file.path, updatedAt: now };
+  localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress));
+  refreshRegisteredFiles();
+  applyFilter();
+  await queueProgressSave();
+}
+function refreshRegisteredFiles() {
+  const map = new Map(state.files.map(f => [f.id, f]));
+  const regs = state.progress.__registrations || {};
+  state.registeredFiles = Object.entries(regs)
+    .filter(([id, r]) => r && r.enabled)
+    .map(([id, r]) => {
+      const live = map.get(id);
+      return live || { id, name: r.name || "（OneDrive上で見つかりません）", path: r.path || "", isMissing: true };
+    })
+    .sort((a,b) => a.path.localeCompare(b.path, "ja"));
 }
 function renderMoreFiles() {
   const list = $("file-list");
   const start = state.rendered;
   const end = Math.min(start + CONFIG.RENDER_BATCH, state.filtered.length);
   const fragment = document.createDocumentFragment();
-
   for (let i = start; i < end; i++) {
     const file = state.filtered[i];
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "file-row w-full text-left p-2 rounded-lg border border-transparent hover:bg-slate-50 hover:border-slate-200";
-    if (state.currentFile?.id === file.id) button.classList.add("active");
-
+    const row = document.createElement("div");
+    row.dataset.fileId = file.id;
+    row.className = "file-row flex items-start gap-1 p-2 rounded-lg border border-transparent hover:bg-slate-50";
+    if (state.currentFile?.id === file.id) row.classList.add("active");
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "min-w-0 flex-1 text-left";
     const name = document.createElement("div");
-    name.className = "font-medium text-slate-700 text-xs truncate";
+    name.className = "font-medium text-slate-700 text-xs break-words";
     name.textContent = file.name;
     const path = document.createElement("div");
-    path.className = "text-[10px] text-slate-400 truncate mt-1";
+    path.className = "text-[10px] text-slate-400 break-all mt-1";
     path.textContent = file.path;
-    button.append(name, path);
-    button.addEventListener("click", () => openFile(file));
-    fragment.appendChild(button);
+    open.append(name, path);
+    open.addEventListener("click", () => { if (!file.isMissing) openFile(file); });
+    row.appendChild(open);
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = "shrink-0 text-[10px] rounded border px-2 py-1 " + (state.listMode === "search" ? "text-blue-700 border-blue-200 hover:bg-blue-50" : "text-slate-500 border-slate-200 hover:bg-slate-100");
+    const registered = !!state.progress.__registrations?.[file.id]?.enabled;
+    action.textContent = state.listMode === "search" ? (registered ? "登録済み" : "登録") : "解除";
+    action.disabled = state.listMode === "search" && registered;
+    action.addEventListener("click", () => saveRegistration(file, state.listMode === "search"));
+    row.appendChild(action);
+    fragment.appendChild(row);
   }
-
   list.appendChild(fragment);
   state.rendered = end;
   $("more-btn").classList.toggle("hidden", state.rendered >= state.filtered.length);
   if (!state.filtered.length) {
-    list.innerHTML = '<div class="text-center text-slate-400 text-xs py-8">Markdownファイルが見つかりません。</div>';
+    list.innerHTML = `<div class="text-center text-slate-400 text-xs py-8">${state.listMode === "search" ? "該当するMarkdownファイルがありません。" : "登録済みファイルはありません。「OneDriveから追加」から登録してください。"}</div>`;
   }
 }
 
 /* =========================
    Markdown本文の取得・表示
    ========================= */
-async function getDownloadUrl(fileId) {
-  const data = await graphJson(`/me/drive/items/${encodeURIComponent(fileId)}?$select=id,name,eTag,@microsoft.graph.downloadUrl`);
-  if (!data["@microsoft.graph.downloadUrl"]) throw new Error("ダウンロードURLを取得できませんでした。");
-  return data["@microsoft.graph.downloadUrl"];
+async function downloadDriveItem(fileId, signal) {
+  if (!fileId) throw new Error("ファイルIDが空です。OneDrive一覧を再同期してください。");
+  // /content はGraphの認証付きエンドポイント。302リダイレクト先をfetchが追跡するため、downloadUrl属性に依存しない。
+  return graphRequest(`/me/drive/items/${encodeURIComponent(fileId)}/content`, { signal });
 }
 async function openFile(file) {
   const requestId = ++state.openRequest;
   if (state.openController) state.openController.abort();
-  const controller = new AbortController();
-  state.openController = controller;
+  state.openController = new AbortController();
 
   state.currentFile = file;
   document.querySelectorAll(".file-row").forEach(el => el.classList.remove("active"));
@@ -529,8 +552,8 @@ async function openFile(file) {
   setProgressStatus("閲覧位置を確認中…");
 
   try {
-    const url = await getDownloadUrl(file.id);
-    const response = await fetch(url, { signal: controller.signal });
+    if (!file.id) throw new Error("ファイルIDがありません。OneDrive一覧を再同期してください。");
+    const response = await downloadDriveItem(file.id, state.openController.signal);
     if (!response.ok) throw new Error("本文のダウンロードに失敗しました（" + response.status + "）。");
     const markdown = await response.text();
     if (requestId !== state.openRequest) return;
@@ -546,9 +569,7 @@ async function openFile(file) {
     $("markdown-viewer").scrollTop = saved?.scrollTop || 0;
     setProgressStatus(saved ? "閲覧位置を復元しました" : "新規ファイル");
     $("markdown-viewer").onscroll = () => scheduleProgressSave(file.id);
-    document.querySelectorAll(".file-row").forEach(el => {
-      if (el.firstChild?.textContent === file.name) el.classList.add("active");
-    });
+    document.querySelectorAll(".file-row").forEach(el => el.classList.toggle("active", el.dataset.fileId === file.id));
   } catch (err) {
     if (err.name === "AbortError") return;
     console.error(err);
@@ -562,34 +583,31 @@ async function openFile(file) {
    OneDrive上のJSONを端末間で共有
    ========================= */
 function mergeProgress(a, b) {
-  const merged = { version: 1, items: {} };
-  const allIds = new Set([
-    ...Object.keys(a?.items || {}),
-    ...Object.keys(b?.items || {})
-  ]);
+  const merged = { version: 2, items: {}, __registrations: {} };
+  const allIds = new Set([...Object.keys(a?.items || {}), ...Object.keys(b?.items || {})]);
   for (const id of allIds) {
-    const av = a?.items?.[id];
-    const bv = b?.items?.[id];
+    const av = a?.items?.[id], bv = b?.items?.[id];
     if (!av) merged.items[id] = bv;
     else if (!bv) merged.items[id] = av;
     else merged.items[id] = (new Date(av.updatedAt || 0) >= new Date(bv.updatedAt || 0)) ? av : bv;
+  }
+  const regIds = new Set([...Object.keys(a?.__registrations || {}), ...Object.keys(b?.__registrations || {})]);
+  for (const id of regIds) {
+    const av = a?.__registrations?.[id], bv = b?.__registrations?.[id];
+    if (!av) merged.__registrations[id] = bv;
+    else if (!bv) merged.__registrations[id] = av;
+    else merged.__registrations[id] = (new Date(av.updatedAt || 0) >= new Date(bv.updatedAt || 0)) ? av : bv;
   }
   return merged;
 }
 async function downloadProgressFile() {
   try {
-    const meta = await graphJson(`/me/drive/root:/${encodeURIComponent(CONFIG.PROGRESS_FILE)}?$select=id,@microsoft.graph.downloadUrl`);
-    state.remoteProgressItemId = meta.id;
-    const url = meta["@microsoft.graph.downloadUrl"];
-    const response = await fetch(url);
-    if (!response.ok) throw new Error("閲覧履歴ファイルを取得できませんでした。");
-    const data = await response.json();
-    return data && typeof data === "object" ? data : { version: 1, items: {} };
+    const response = await graphRequest(`/me/drive/root:/${encodeURIComponent(CONFIG.PROGRESS_FILE)}:/content`);
+    const text = await response.text();
+    const data = JSON.parse(text || "{}");
+    return data && typeof data === "object" ? data : { version: 2, items: {}, __registrations: {} };
   } catch (err) {
-    if (/Graph APIエラー 404/.test(errorMessage(err))) {
-      state.remoteProgressItemId = null;
-      return { version: 1, items: {} };
-    }
+    if (/Graph APIエラー 404/.test(errorMessage(err))) return { version: 2, items: {}, __registrations: {} };
     throw err;
   }
 }
@@ -600,8 +618,8 @@ async function uploadProgressFile(data) {
     headers: { "Content-Type": "text/plain; charset=utf-8" },
     body
   });
-  const result = await response.json();
-  state.remoteProgressItemId = result.id || state.remoteProgressItemId;
+  // /content PUTは通常DriveItemを返すが、空レスポンスでも保存処理自体は成功扱いにする。
+  if (response.status !== 204) await response.json().catch(() => null);
 }
 function scheduleProgressSave(fileId) {
   if (!fileId) return;
@@ -621,11 +639,14 @@ function queueProgressSave() {
     try {
       // 他端末で更新された履歴を先に取得してマージする
       const remote = await downloadProgressFile();
-      const local = { version: 1, items: state.progress };
+      const localItems = Object.fromEntries(Object.entries(state.progress).filter(([key]) => key !== "__registrations"));
+      const local = { version: 2, items: localItems, __registrations: state.progress.__registrations || {} };
       const merged = mergeProgress(remote, local);
       await uploadProgressFile(merged);
-      state.progress = merged.items;
+      state.progress = { ...merged.items, __registrations: merged.__registrations };
       localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress));
+      refreshRegisteredFiles();
+      applyFilter();
       setProgressStatus("同期済み");
     } catch (err) {
       console.error(err);
@@ -640,12 +661,12 @@ async function loadProgress() {
     try { return JSON.parse(localStorage.getItem("md_reader_progress_backup") || "{}"); }
     catch (_) { return {}; }
   })();
-  state.progress = backup;
+  const backupDoc = { version: 2, items: Object.fromEntries(Object.entries(backup).filter(([k]) => k !== "__registrations")), __registrations: backup.__registrations || {} };
   const remote = await downloadProgressFile();
-  state.progress = mergeProgress(remote, { version: 1, items: backup }).items;
+  const merged = mergeProgress(remote, backupDoc);
+  state.progress = { ...merged.items, __registrations: merged.__registrations };
   localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress));
 }
-
 /* =========================
    アプリ起動
    ========================= */
@@ -683,6 +704,8 @@ $("logout-btn").addEventListener("click", logout);
 $("sync-btn").addEventListener("click", syncDrive);
 $("filter-input").addEventListener("input", applyFilter);
 $("more-btn").addEventListener("click", renderMoreFiles);
+$("show-registered-btn").addEventListener("click", () => setListMode("registered"));
+$("show-search-btn").addEventListener("click", () => setListMode("search"));
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") flushProgress();
 });
