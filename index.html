@@ -1,263 +1,712 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OneDrive Markdown Reader</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Marked.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
-    <!-- MSAL -->
-    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
-    
-    <style>
-        #markdown-viewer { font-size: 0.95rem; line-height: 1.8; color: #334155; }
-        #markdown-viewer h1, #markdown-viewer h2, #markdown-viewer h3, #markdown-viewer h4 { color: #0f172a; font-weight: 700; margin-top: 1.8em; margin-bottom: 0.8em; }
-        #markdown-viewer h1 { font-size: 1.5rem; border-bottom: 2px solid #94a3b8; padding-bottom: 0.4em; }
-        #markdown-viewer h2 { font-size: 1.25rem; border-bottom: 1px solid #cbd5e1; padding-bottom: 0.3em; }
-        #markdown-viewer h3 { font-size: 1.1rem; border-left: 4px solid #3b82f6; padding-left: 0.6em; }
-        #markdown-viewer strong { color: #0369a1; background-color: #f0f9ff; padding: 2px 4px; border-radius: 4px; font-weight: 700; }
-        #markdown-viewer ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1em; }
-        #markdown-viewer ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 1em; }
-        #markdown-viewer li { margin-bottom: 0.4em; }
-        #markdown-viewer p { margin-bottom: 1em; }
-        #markdown-viewer hr { border-color: #e2e8f0; margin: 2em 0; border-style: solid; }
-        #markdown-viewer blockquote { border-left: 4px solid #cbd5e1; color: #64748b; margin: 1em 0; background-color: #f8fafc; padding: 0.5em 1em; border-radius: 0 4px 4px 0; }
-        #markdown-viewer code { background-color: #f1f5f9; color: #be123c; padding: 0.2em 0.4em; border-radius: 0.25rem; font-family: monospace; font-size: 0.9em; }
-        #markdown-viewer pre { background-color: #1e293b; color: #f8fafc; padding: 1em; border-radius: 0.5rem; overflow-x: auto; margin-bottom: 1em; }
-        #markdown-viewer pre code { background-color: transparent; color: inherit; padding: 0; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OneDrive Markdown Reader v3.0</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js"></script>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #markdown-viewer { font-size:.96rem; line-height:1.85; color:#334155; overflow-wrap:anywhere; }
+  #markdown-viewer h1,#markdown-viewer h2,#markdown-viewer h3,#markdown-viewer h4 { color:#0f172a;font-weight:700;margin:1.7em 0 .7em;line-height:1.4; }
+  #markdown-viewer h1 {font-size:1.65rem;border-bottom:2px solid #cbd5e1;padding-bottom:.4em}
+  #markdown-viewer h2 {font-size:1.35rem;border-bottom:1px solid #e2e8f0;padding-bottom:.3em}
+  #markdown-viewer h3 {font-size:1.12rem;border-left:4px solid #3b82f6;padding-left:.65em}
+  #markdown-viewer p {margin:.8em 0}
+  #markdown-viewer ul {list-style:disc;padding-left:1.6em;margin:.8em 0}
+  #markdown-viewer ol {list-style:decimal;padding-left:1.6em;margin:.8em 0}
+  #markdown-viewer li {margin:.25em 0}
+  #markdown-viewer blockquote {border-left:4px solid #cbd5e1;padding:.5em 1em;background:#f8fafc;color:#64748b;margin:1em 0}
+  #markdown-viewer code {background:#f1f5f9;color:#be123c;padding:.15em .35em;border-radius:4px;font-family:ui-monospace,monospace;font-size:.9em}
+  #markdown-viewer pre {background:#1e293b;color:#f8fafc;padding:1em;border-radius:8px;overflow:auto;margin:1em 0}
+  #markdown-viewer pre code {background:transparent;color:inherit;padding:0}
+  #markdown-viewer table {border-collapse:collapse;width:100%;display:block;overflow-x:auto;margin:1em 0}
+  #markdown-viewer th,#markdown-viewer td {border:1px solid #cbd5e1;padding:.5em .7em;text-align:left;min-width:100px}
+  #markdown-viewer th {background:#f1f5f9}
+  #markdown-viewer img {max-width:100%;height:auto}
+  #markdown-viewer a {color:#2563eb;text-decoration:underline}
+  #markdown-viewer hr {border:0;border-top:1px solid #e2e8f0;margin:2em 0}
+  .file-row.active {background:#eff6ff;border-color:#93c5fd}
+  .spinner {width:15px;height:15px;border:2px solid #cbd5e1;border-top-color:#2563eb;border-radius:50%;display:inline-block;animation:spin .8s linear infinite}
+  @keyframes spin {to{transform:rotate(360deg)}}
+</style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+<header class="bg-white border-b border-slate-200 px-4 py-3 flex flex-wrap gap-3 justify-between items-center shadow-sm">
+  <div class="flex items-center gap-2">
+    <h1 class="text-lg font-bold text-slate-800">📖 OneDrive Markdown Reader</h1>
+    <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded-full">v3.0</span>
+  </div>
+  <div class="flex items-center gap-3">
+    <span id="account-label" class="text-xs text-slate-500"></span>
+    <button id="login-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Microsoft ログイン</button>
+    <button id="logout-btn" class="hidden border border-slate-300 hover:bg-slate-100 px-3 py-2 rounded-lg text-sm">ログアウト</button>
+  </div>
+</header>
 
-    <header class="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shadow-sm">
-        <div class="flex items-center gap-2">
-            <h1 class="text-lg font-bold text-slate-700">📖 OneDrive Markdown Reader</h1>
-            <!-- ブラックバッジ -->
-            <span class="bg-slate-800 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full">v2.8.0</span>
-        </div>
-        <div id="auth-section">
-            <button id="login-btn" type="button" onclick="window.startLogin()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
-                Microsoft ログイン
-            </button>
-        </div>
-    </header>
+<main class="flex-1 w-full p-3 md:p-5 flex flex-col md:flex-row gap-4 min-h-0">
+  <aside class="w-full md:w-96 md:flex-shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[42vh] md:h-[calc(100vh-6.5rem)]">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="text-sm font-bold text-slate-700">Markdown ファイル</h2>
+      <button id="sync-btn" class="text-xs text-blue-700 hover:underline disabled:text-slate-400" disabled>一覧を同期</button>
+    </div>
+    <input id="filter-input" type="search" placeholder="ファイル名・フォルダ名で検索" class="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full mb-2" disabled>
+    <div class="flex justify-between text-xs text-slate-500 mb-2">
+      <span id="file-count">0 件</span>
+      <span id="sync-time">未同期</span>
+    </div>
+    <div id="list-status" class="text-xs text-slate-500 mb-2">Microsoftログイン後に一覧を同期します。</div>
+    <div id="file-list" class="overflow-y-auto flex-1 space-y-1 text-sm min-h-0">
+      <div class="text-center text-slate-400 text-xs py-8">ログインしてください。</div>
+    </div>
+    <button id="more-btn" class="hidden mt-2 w-full border rounded-lg py-2 text-xs hover:bg-slate-50">さらに表示</button>
+  </aside>
 
-    <main class="flex-1 w-full px-2 py-4 md:px-4 md:py-6 flex flex-col md:flex-row gap-4 md:gap-6 items-stretch">
-        
-        <aside style="resize: horizontal;" class="overflow-hidden w-full md:w-80 md:min-w-[16rem] flex-shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[70vh] md:h-[calc(100vh-8rem)] relative">
-            <div class="mb-3">
-                <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">ファイル名検索</h2>
-                <div class="flex gap-2">
-                    <input id="target-filter" type="text" placeholder="例: bukken_notes.md" class="flex-1 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-slate-800">
-                    <button id="search-btn" type="button" onclick="window.startSearch()" class="bg-slate-800 hover:bg-slate-900 text-white px-2.5 py-1 rounded text-xs transition cursor-pointer">検索</button>
-                </div>
-            </div>
-            <hr class="border-slate-100 my-2">
-            <div class="flex justify-between items-center mb-2">
-                <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Markdown 一覧</h2>
-                <span id="file-count" class="text-xs text-slate-400">0 件</span>
-            </div>
-            <div id="file-list" class="overflow-y-auto flex-1 space-y-1.5 text-sm pb-4">
-                <p class="text-slate-400 text-center py-8 text-xs">ログインしてファイルを読み込んでください。</p>
-            </div>
-        </aside>
+  <section class="flex-1 min-w-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 flex flex-col h-[55vh] md:h-[calc(100vh-6.5rem)]">
+    <div id="viewer-header" class="hidden border-b pb-3 mb-3 flex justify-between gap-3 items-center">
+      <div class="min-w-0">
+        <div id="current-file-name" class="font-bold text-slate-800 truncate"></div>
+        <div id="current-file-path" class="text-xs text-slate-400 truncate"></div>
+      </div>
+      <span id="progress-status" class="text-xs text-slate-500 whitespace-nowrap">閲覧位置</span>
+    </div>
+    <div id="markdown-viewer" class="overflow-y-auto flex-1 min-h-0 pr-2">
+      <div class="text-center py-20 text-slate-400">
+        <p class="text-lg mb-2">Markdownファイルを選択してください。</p>
+        <p class="text-sm">閲覧位置はファイルごとに自動保存されます。</p>
+      </div>
+    </div>
+  </section>
+</main>
 
-        <section style="resize: horizontal;" class="overflow-hidden flex-1 min-w-[300px] bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col h-[75vh] md:h-[calc(100vh-8rem)] relative">
-            <div id="viewer-header" class="border-b pb-3 mb-4 flex justify-between items-center hidden">
-                <div class="min-w-0 flex-1 pr-4">
-                    <span id="current-file-name" class="font-bold text-slate-700 text-base truncate block">ファイル未選択</span>
-                    <span id="current-file-path" class="text-xs text-slate-400 mt-0.5 truncate block"></span>
-                </div>
-                <span id="sync-status" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded flex-shrink-0">同期済み</span>
-            </div>
-            <div id="markdown-viewer" class="overflow-y-auto flex-1 pr-2">
-                <div class="text-center py-20 text-slate-400">
-                    <p class="text-lg mb-2">左側のリストからファイルを選択してください。</p>
-                </div>
-            </div>
-        </section>
-    </main>
+<div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 hidden max-w-[90vw] bg-slate-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg z-50"></div>
 
-    <!-- 【スクリプトブロック1: 関数の定義のみ】ここでエラーが起きることは絶対にありません -->
-    <script>
-        window.myMsal = null;
-        window.myAccessToken = null;
-        window.readingProgress = {};
-        window.scrollTimeout = null;
+<script>
+(() => {
+"use strict";
 
-        window.startLogin = function() {
-            // ★ボタンが押された証拠のアラートを必ず出します
-            alert("ログイン処理を開始します。");
-            if (!window.myMsal) {
-                alert("MSAL(認証ライブラリ)がまだ読み込まれていません。ページを更新してください。");
-                return;
-            }
-            window.myMsal.loginRedirect({ scopes: ["User.Read", "Files.ReadWrite"] })
-                .catch(function(err) {
-                    alert("ログインエラー: " + err.message);
-                });
-        };
+/* =========================
+   設定
+   ========================= */
+const CONFIG = {
+  CLIENT_ID: "3c6cf6bf-6af7-4bd0-ad41-cca85929f8b6",
+  AUTHORITY: "https://login.microsoftonline.com/consumers",
+  REDIRECT_URI: window.location.origin + window.location.pathname,
+  SCOPES: ["User.Read", "Files.ReadWrite"],
+  GRAPH: "https://graph.microsoft.com/v1.0",
+  DB_NAME: "OneDriveMarkdownReader",
+  DB_VERSION: 1,
+  PROGRESS_FILE: "reading-progress.json",
+  PAGE_SIZE: 200,
+  RENDER_BATCH: 200,
+  SAVE_DELAY: 1800
+};
 
-        window.startSearch = function() {
-            const filterInputEl = document.getElementById('target-filter');
-            if (filterInputEl) localStorage.setItem('md_reader_filter', filterInputEl.value.trim());
-            if (window.myAccessToken) {
-                window.loadFilesAndProgress();
-            } else {
-                alert("先にMicrosoftログインを行ってください。");
-            }
-        };
+const $ = id => document.getElementById(id);
+const state = {
+  msal: null,
+  account: null,
+  token: null,
+  files: [],
+  filtered: [],
+  rendered: 0,
+  currentFile: null,
+  openRequest: 0,
+  openController: null,
+  scrollTimer: null,
+  saveTimer: null,
+  saveChain: Promise.resolve(),
+  progress: {},
+  remoteProgressItemId: null,
+  db: null,
+  syncing: false,
+  toastTimer: null
+};
 
-        window.callGraphAPI = async function(endpoint, method = "GET", body = null) {
-            const headers = new Headers();
-            headers.append("Authorization", `Bearer ${window.myAccessToken}`);
-            if (body) headers.append("Content-Type", "application/json");
-            const options = { method, headers };
-            if (body) options.body = JSON.stringify(body);
-            const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, options);
-            if (!response.ok && response.status !== 404) throw new Error(`Graph API Error: ${response.status}`);
-            return response.status === 404 ? null : await response.json();
-        };
+function showToast(message, ms = 4500) {
+  const el = $("toast");
+  el.textContent = message;
+  el.classList.remove("hidden");
+  clearTimeout(state.toastTimer);
+  state.toastTimer = setTimeout(() => el.classList.add("hidden"), ms);
+}
+function setListStatus(message) { $("list-status").textContent = message; }
+function setProgressStatus(message) { $("progress-status").textContent = message; }
+function errorMessage(err) {
+  if (!err) return "原因不明のエラー";
+  return err.message || String(err);
+}
+function safeText(value) { return String(value ?? ""); }
 
-        window.loadFilesAndProgress = async function() {
-            const fileListEl = document.getElementById('file-list');
-            const fileCountEl = document.getElementById('file-count');
-            fileListEl.innerHTML = `<p class="text-slate-400 text-center py-6 text-xs">スキャン中...<br>数秒かかります。</p>`;
+/* =========================
+   IndexedDB：ファイル一覧キャッシュ
+   ========================= */
+function openDatabase() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(CONFIG.DB_NAME, CONFIG.DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("items")) db.createObjectStore("items", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "key" });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbGet(storeName, key) {
+  return new Promise((resolve, reject) => {
+    const tx = state.db.transaction(storeName, "readonly");
+    const req = tx.objectStore(storeName).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbGetAll(storeName) {
+  return new Promise((resolve, reject) => {
+    const tx = state.db.transaction(storeName, "readonly");
+    const req = tx.objectStore(storeName).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbPutMany(storeName, records) {
+  return new Promise((resolve, reject) => {
+    const tx = state.db.transaction(storeName, "readwrite");
+    const store = tx.objectStore(storeName);
+    records.forEach(record => store.put(record));
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+function idbDeleteMany(storeName, ids) {
+  return new Promise((resolve, reject) => {
+    const tx = state.db.transaction(storeName, "readwrite");
+    const store = tx.objectStore(storeName);
+    ids.forEach(id => store.delete(id));
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+function idbSetMeta(key, value) {
+  return idbPutMany("meta", [{ key, value }]);
+}
 
-            try {
-                const progressRes = await window.callGraphAPI("/me/drive/root:/reading-progress.json:/content");
-                window.readingProgress = progressRes || {};
-                const filterWord = (document.getElementById('target-filter').value || "").trim().toLowerCase();
-                
-                let mdFiles = [];
-                let nextLink = "/me/drive/root/search(q='.md')?$top=200";
-                
-                while (nextLink) {
-                    let searchRes;
-                    if (nextLink.startsWith('http')) {
-                        const response = await fetch(nextLink, { headers: { "Authorization": `Bearer ${window.myAccessToken}` } });
-                        if (!response.ok) break;
-                        searchRes = await response.json();
-                    } else {
-                        searchRes = await window.callGraphAPI(nextLink);
-                    }
-                    if (searchRes && searchRes.value) {
-                        const chunk = searchRes.value.filter(f => f.file && f.name.toLowerCase().endsWith('.md')).map(f => {
-                            let relPath = f.name;
-                            if (f.parentReference && f.parentReference.path) {
-                                relPath = decodeURIComponent(f.parentReference.path.replace(/^\/drive\/root:/, '')) + '/' + f.name;
-                                relPath = relPath.replace(/^\/+/, '');
-                            }
-                            return { id: f.id, name: f.name, path: relPath };
-                        });
-                        mdFiles = mdFiles.concat(chunk);
-                        nextLink = searchRes['@odata.nextLink'] || null;
-                    } else break;
-                }
+/* =========================
+   MSAL認証
+   ========================= */
+async function initAuth() {
+  if (!window.msal || !window.msal.PublicClientApplication) {
+    throw new Error("MSALライブラリを読み込めません。CDN接続を確認してください。");
+  }
 
-                if (filterWord) mdFiles = mdFiles.filter(f => f.path.toLowerCase().includes(filterWord) || f.name.toLowerCase().includes(filterWord));
-                fileCountEl.textContent = `${mdFiles.length} 件`;
-                fileListEl.innerHTML = "";
+  state.msal = new msal.PublicClientApplication({
+    auth: {
+      clientId: CONFIG.CLIENT_ID,
+      authority: CONFIG.AUTHORITY,
+      redirectUri: CONFIG.REDIRECT_URI,
+      navigateToLoginRequestUrl: true
+    },
+    cache: {
+      cacheLocation: "localStorage",
+      storeAuthStateInCookie: false
+    },
+    system: {
+      allowRedirectInIframe: false
+    }
+  });
 
-                if (mdFiles.length === 0) {
-                    fileListEl.innerHTML = `<div class="text-center py-6 px-2 text-xs text-slate-400"><p>見つかりませんでした</p></div>`;
-                    return;
-                }
+  await state.msal.initialize();
+  const redirectResult = await state.msal.handleRedirectPromise();
 
-                mdFiles.sort((a, b) => a.name.localeCompare(b.name));
-                mdFiles.forEach(file => {
-                    const itemBtn = document.createElement('div');
-                    itemBtn.className = "p-2 rounded-lg hover:bg-slate-100 cursor-pointer transition border border-transparent hover:border-slate-200";
-                    itemBtn.innerHTML = `<div class="font-medium text-slate-700 truncate text-xs">${file.name}</div><div class="text-[10px] text-slate-400 truncate mt-0.5" title="${file.path}">${file.path}</div>`;
-                    itemBtn.onclick = () => window.openFile(file.id, file.name, file.path);
-                    fileListEl.appendChild(itemBtn);
-                });
+  if (redirectResult && redirectResult.account) {
+    state.account = redirectResult.account;
+    state.msal.setActiveAccount(state.account);
+  } else {
+    const accounts = state.msal.getAllAccounts();
+    if (accounts.length) {
+      state.account = state.msal.getActiveAccount() || accounts[0];
+      state.msal.setActiveAccount(state.account);
+    }
+  }
 
-                if (mdFiles.length === 1) window.openFile(mdFiles[0].id, mdFiles[0].name, mdFiles[0].path);
+  if (state.account) {
+    await acquireToken();
+    setLoggedInUI();
+    await startApp();
+  }
+}
+async function login() {
+  try {
+    await state.msal.loginRedirect({
+      scopes: CONFIG.SCOPES,
+      prompt: "select_account"
+    });
+  } catch (err) {
+    showToast("ログイン開始エラー：" + errorMessage(err));
+  }
+}
+async function acquireToken() {
+  if (!state.account) throw new Error("Microsoftアカウントが選択されていません。");
+  try {
+    const result = await state.msal.acquireTokenSilent({
+      scopes: CONFIG.SCOPES,
+      account: state.account
+    });
+    state.token = result.accessToken;
+    return state.token;
+  } catch (err) {
+    if (err instanceof msal.InteractionRequiredAuthError ||
+        err.errorCode === "interaction_required" ||
+        err.errorCode === "login_required" ||
+        err.errorCode === "consent_required") {
+      await state.msal.acquireTokenRedirect({
+        scopes: CONFIG.SCOPES,
+        account: state.account
+      });
+      return null;
+    }
+    throw err;
+  }
+}
+async function logout() {
+  if (!state.msal || !state.account) return;
+  await state.msal.logoutRedirect({ account: state.account });
+}
+function setLoggedInUI() {
+  $("login-btn").classList.add("hidden");
+  $("logout-btn").classList.remove("hidden");
+  $("account-label").textContent = state.account?.username || "ログイン中";
+  $("sync-btn").disabled = false;
+  $("filter-input").disabled = false;
+}
 
-            } catch (err) {
-                console.error(err);
-                fileListEl.innerHTML = `<p class="text-red-500 text-center py-6 text-xs">取得に失敗しました。</p>`;
-            }
-        };
+/* =========================
+   Microsoft Graph共通処理
+   ========================= */
+async function graphRequest(url, options = {}, retryAuth = true) {
+  if (!state.token) await acquireToken();
+  if (!state.token) throw new Error("アクセストークンを取得できませんでした。");
 
-        window.openFile = async function(fileId, fileName, filePath) {
-            document.getElementById('viewer-header').classList.remove('hidden');
-            document.getElementById('current-file-name').textContent = fileName;
-            document.getElementById('current-file-path').textContent = filePath;
-            const viewer = document.getElementById('markdown-viewer');
-            viewer.innerHTML = `<p class="text-center py-10 text-slate-400 text-sm">読み込み中...</p>`;
+  const fullUrl = url.startsWith("http") ? url : CONFIG.GRAPH + url;
+  const headers = new Headers(options.headers || {});
+  headers.set("Authorization", "Bearer " + state.token);
 
-            try {
-                const itemMeta = await window.callGraphAPI(`/me/drive/items/${fileId}`);
-                const downloadUrl = itemMeta['@microsoft.graph.downloadUrl'];
-                if (!downloadUrl) throw new Error("URL取得失敗");
+  const response = await fetch(fullUrl, { ...options, headers });
 
-                const contentRes = await fetch(downloadUrl);
-                if (!contentRes.ok) throw new Error("本文取得失敗");
-                
-                const markdownText = await contentRes.text();
-                viewer.innerHTML = marked.parse(markdownText);
+  if (response.status === 401 && retryAuth) {
+    state.token = null;
+    await acquireToken();
+    if (!state.token) throw new Error("再認証が必要です。");
+    return graphRequest(url, options, false);
+  }
 
-                if (window.readingProgress[fileId]) viewer.scrollTop = window.readingProgress[fileId];
-                viewer.onscroll = () => {
-                    clearTimeout(window.scrollTimeout);
-                    window.scrollTimeout = setTimeout(() => window.saveProgress(fileId, viewer.scrollTop), 1000);
-                };
-            } catch (err) {
-                viewer.innerHTML = `<p class="text-center text-red-500 text-sm mt-10">読み込みに失敗しました。</p>`;
-            }
-        };
+  if (response.status === 429 || response.status === 503 || response.status === 504) {
+    const retryAfter = Number(response.headers.get("Retry-After") || 3);
+    throw new Error(`Microsoft Graphが一時的に混雑しています（${response.status}）。${retryAfter}秒後に再試行してください。`);
+  }
 
-        window.saveProgress = async function(fileId, scrollTop) {
-            window.readingProgress[fileId] = scrollTop;
-            document.getElementById('sync-status').textContent = "同期中...";
-            try {
-                await window.callGraphAPI(`/me/drive/root:/reading-progress.json:/content`, "PUT", window.readingProgress);
-                document.getElementById('sync-status').textContent = "同期済み";
-            } catch (err) {
-                document.getElementById('sync-status').textContent = "同期失敗";
-            }
-        };
-    </script>
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const body = await response.json();
+      detail = body.error?.message || body.error?.code || "";
+    } catch (_) {}
+    throw new Error(`Graph APIエラー ${response.status}${detail ? "：" + detail : ""}`);
+  }
+  return response;
+}
+async function graphJson(url, options = {}) {
+  const response = await graphRequest(url, options);
+  if (response.status === 204) return null;
+  return response.json();
+}
 
-    <!-- 【スクリプトブロック2: 実行処理】 -->
-    <script>
-        (async function initApp() {
-            try {
-                const inputEl = document.getElementById('target-filter');
-                if (inputEl) inputEl.value = localStorage.getItem('md_reader_filter') || "";
+/* =========================
+   Delta同期
+   初回はドライブ全体を列挙し、
+   2回目以降はdeltaLinkで差分取得
+   ========================= */
+function toStoredItem(item) {
+  return {
+    id: item.id,
+    name: item.name || "",
+    parentId: item.parentReference?.id || null,
+    isFolder: !!item.folder,
+    isFile: !!item.file,
+    size: item.size || 0,
+    modified: item.lastModifiedDateTime || "",
+    eTag: item.eTag || "",
+    cTag: item.cTag || ""
+  };
+}
+async function syncDrive() {
+  if (state.syncing) return;
+  state.syncing = true;
+  $("sync-btn").disabled = true;
+  $("sync-btn").textContent = "同期中…";
+  setListStatus("OneDriveの変更を確認しています…");
 
-                if (typeof msal === 'undefined') {
-                    console.error("MSAL is undefined.");
-                    return;
-                }
+  try {
+    let deltaLink = (await idbGet("meta", "deltaLink"))?.value || null;
+    let nextUrl = deltaLink || "/me/drive/root/delta?$top=" + CONFIG.PAGE_SIZE;
+    let changed = [];
+    let deleted = [];
+    let deletedFolders = [];
+    let pages = 0;
+    let finalDeltaLink = null;
 
-                const CLIENT_ID = "3c6cf6bf-6af7-4bd0-ad41-cca85929f8b6";
-                const redirectUri = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/');
-                window.myMsal = new msal.PublicClientApplication({ auth: { clientId: CLIENT_ID, redirectUri: redirectUri } });
-                await window.myMsal.initialize();
+    while (nextUrl) {
+      pages++;
+      setListStatus(`ファイル情報を同期中… ${pages} ページ`);
+      let response;
+      try {
+        response = await graphJson(nextUrl, {
+          headers: { "Prefer": "odata.maxpagesize=" + CONFIG.PAGE_SIZE }
+        });
+      } catch (err) {
+        // 古いdelta tokenが無効な場合は初回同期に戻す
+        if (deltaLink && /Graph APIエラー (400|410|404)/.test(errorMessage(err))) {
+          await idbSetMeta("deltaLink", null);
+          deltaLink = null;
+          nextUrl = "/me/drive/root/delta?$top=" + CONFIG.PAGE_SIZE;
+          changed = [];
+          deleted = [];
+          deletedFolders = [];
+          pages = 0;
+          continue;
+        }
+        throw err;
+      }
 
-                const response = await window.myMsal.handleRedirectPromise();
-                if (response) {
-                    window.myAccessToken = response.accessToken;
-                    document.getElementById('auth-section').innerHTML = `<span class="text-sm text-green-600 font-medium">ログイン中</span>`;
-                    window.loadFilesAndProgress();
-                } else {
-                    const accounts = window.myMsal.getAllAccounts();
-                    if (accounts.length > 0) {
-                        const silentRes = await window.myMsal.acquireTokenSilent({ scopes: ["User.Read", "Files.ReadWrite"], account: accounts[0] });
-                        window.myAccessToken = silentRes.accessToken;
-                        document.getElementById('auth-section').innerHTML = `<span class="text-sm text-green-600 font-medium">ログイン中</span>`;
-                        window.loadFilesAndProgress();
-                    }
-                }
-            } catch (err) {
-                console.error("初期化エラー:", err);
-            }
-        })();
-    </script>
+      for (const item of (response.value || [])) {
+        if (item.deleted) {
+          deleted.push(item.id);
+          if (item.folder) deletedFolders.push(item.id);
+        } else {
+          changed.push(toStoredItem(item));
+        }
+      }
+      nextUrl = response["@odata.nextLink"] || null;
+      finalDeltaLink = response["@odata.deltaLink"] || finalDeltaLink;
+    }
+
+    if (changed.length) await idbPutMany("items", changed);
+    if (deleted.length) {
+      // フォルダ削除時、Deltaが子ファイルを個別に返さない場合に備えて
+      // ローカルの親子関係から配下の項目も削除する。
+      const existing = await idbGetAll("items");
+      const byId = new Map(existing.map(x => [x.id, x]));
+      const removeSet = new Set(deleted);
+      const removedFolders = new Set(deletedFolders);
+      for (const item of existing) {
+        let parentId = item.parentId;
+        let guard = 0;
+        while (parentId && guard++ < 100) {
+          if (removedFolders.has(parentId) || removeSet.has(parentId)) {
+            removeSet.add(item.id);
+            break;
+          }
+          parentId = byId.get(parentId)?.parentId || null;
+        }
+      }
+      await idbDeleteMany("items", [...removeSet]);
+    }
+    if (finalDeltaLink) await idbSetMeta("deltaLink", finalDeltaLink);
+
+    await loadFileIndex();
+    const now = new Date();
+    await idbSetMeta("lastSync", now.toISOString());
+    $("sync-time").textContent = now.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+    setListStatus(`同期完了（変更 ${changed.length} 件 / 削除 ${deleted.length} 件）`);
+    showToast("OneDriveのファイル一覧を同期しました。");
+  } catch (err) {
+    console.error(err);
+    setListStatus("同期エラー：" + errorMessage(err));
+    showToast("ファイル同期に失敗しました：" + errorMessage(err), 7000);
+    // キャッシュがあれば表示を維持する
+    await loadFileIndex().catch(console.error);
+  } finally {
+    state.syncing = false;
+    $("sync-btn").disabled = false;
+    $("sync-btn").textContent = "一覧を同期";
+  }
+}
+
+/* =========================
+   ファイル一覧・検索・パス
+   ========================= */
+async function loadFileIndex() {
+  const all = await idbGetAll("items");
+  const byId = new Map(all.map(x => [x.id, x]));
+  const files = all.filter(x => x.isFile && /\.md$/i.test(x.name));
+
+  function getPath(item) {
+    const parts = [item.name];
+    let parentId = item.parentId;
+    let safety = 0;
+    while (parentId && byId.has(parentId) && safety++ < 100) {
+      const parent = byId.get(parentId);
+      if (parent.isFolder && parent.name) parts.unshift(parent.name);
+      parentId = parent.parentId;
+    }
+    return parts.join("/");
+  }
+
+  state.files = files.map(item => ({ ...item, path: getPath(item) }))
+    .sort((a, b) => a.path.localeCompare(b.path, "ja"));
+  applyFilter();
+}
+function applyFilter() {
+  const q = $("filter-input").value.trim().toLocaleLowerCase();
+  state.filtered = q
+    ? state.files.filter(f => f.name.toLocaleLowerCase().includes(q) || f.path.toLocaleLowerCase().includes(q))
+    : state.files.slice();
+  state.rendered = 0;
+  $("file-count").textContent = `${state.filtered.length.toLocaleString("ja-JP")} 件`;
+  $("file-list").innerHTML = "";
+  renderMoreFiles();
+}
+function renderMoreFiles() {
+  const list = $("file-list");
+  const start = state.rendered;
+  const end = Math.min(start + CONFIG.RENDER_BATCH, state.filtered.length);
+  const fragment = document.createDocumentFragment();
+
+  for (let i = start; i < end; i++) {
+    const file = state.filtered[i];
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "file-row w-full text-left p-2 rounded-lg border border-transparent hover:bg-slate-50 hover:border-slate-200";
+    if (state.currentFile?.id === file.id) button.classList.add("active");
+
+    const name = document.createElement("div");
+    name.className = "font-medium text-slate-700 text-xs truncate";
+    name.textContent = file.name;
+    const path = document.createElement("div");
+    path.className = "text-[10px] text-slate-400 truncate mt-1";
+    path.textContent = file.path;
+    button.append(name, path);
+    button.addEventListener("click", () => openFile(file));
+    fragment.appendChild(button);
+  }
+
+  list.appendChild(fragment);
+  state.rendered = end;
+  $("more-btn").classList.toggle("hidden", state.rendered >= state.filtered.length);
+  if (!state.filtered.length) {
+    list.innerHTML = '<div class="text-center text-slate-400 text-xs py-8">Markdownファイルが見つかりません。</div>';
+  }
+}
+
+/* =========================
+   Markdown本文の取得・表示
+   ========================= */
+async function getDownloadUrl(fileId) {
+  const data = await graphJson(`/me/drive/items/${encodeURIComponent(fileId)}?$select=id,name,eTag,@microsoft.graph.downloadUrl`);
+  if (!data["@microsoft.graph.downloadUrl"]) throw new Error("ダウンロードURLを取得できませんでした。");
+  return data["@microsoft.graph.downloadUrl"];
+}
+async function openFile(file) {
+  const requestId = ++state.openRequest;
+  if (state.openController) state.openController.abort();
+  const controller = new AbortController();
+  state.openController = controller;
+
+  state.currentFile = file;
+  document.querySelectorAll(".file-row").forEach(el => el.classList.remove("active"));
+  // 現在の項目を見た目上選択
+  const selected = [...document.querySelectorAll(".file-row")].find(el => el.firstChild?.textContent === file.name);
+  if (selected) selected.classList.add("active");
+
+  $("viewer-header").classList.remove("hidden");
+  $("current-file-name").textContent = file.name;
+  $("current-file-path").textContent = file.path;
+  $("markdown-viewer").innerHTML = '<div class="text-center py-12 text-slate-400"><span class="spinner"></span><p class="mt-3 text-sm">読み込み中…</p></div>';
+  setProgressStatus("閲覧位置を確認中…");
+
+  try {
+    const url = await getDownloadUrl(file.id);
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error("本文のダウンロードに失敗しました（" + response.status + "）。");
+    const markdown = await response.text();
+    if (requestId !== state.openRequest) return;
+
+    const rawHtml = marked.parse(markdown, { gfm: true, breaks: false });
+    const cleanHtml = DOMPurify.sanitize(rawHtml, {
+      USE_PROFILES: { html: true },
+      ADD_ATTR: ["target", "rel"]
+    });
+    $("markdown-viewer").innerHTML = cleanHtml;
+
+    const saved = state.progress[file.id];
+    $("markdown-viewer").scrollTop = saved?.scrollTop || 0;
+    setProgressStatus(saved ? "閲覧位置を復元しました" : "新規ファイル");
+    $("markdown-viewer").onscroll = () => scheduleProgressSave(file.id);
+    document.querySelectorAll(".file-row").forEach(el => {
+      if (el.firstChild?.textContent === file.name) el.classList.add("active");
+    });
+  } catch (err) {
+    if (err.name === "AbortError") return;
+    console.error(err);
+    $("markdown-viewer").textContent = "本文の読み込みに失敗しました：" + errorMessage(err);
+    setProgressStatus("読み込み失敗");
+  }
+}
+
+/* =========================
+   閲覧位置の同期
+   OneDrive上のJSONを端末間で共有
+   ========================= */
+function mergeProgress(a, b) {
+  const merged = { version: 1, items: {} };
+  const allIds = new Set([
+    ...Object.keys(a?.items || {}),
+    ...Object.keys(b?.items || {})
+  ]);
+  for (const id of allIds) {
+    const av = a?.items?.[id];
+    const bv = b?.items?.[id];
+    if (!av) merged.items[id] = bv;
+    else if (!bv) merged.items[id] = av;
+    else merged.items[id] = (new Date(av.updatedAt || 0) >= new Date(bv.updatedAt || 0)) ? av : bv;
+  }
+  return merged;
+}
+async function downloadProgressFile() {
+  try {
+    const meta = await graphJson(`/me/drive/root:/${encodeURIComponent(CONFIG.PROGRESS_FILE)}?$select=id,@microsoft.graph.downloadUrl`);
+    state.remoteProgressItemId = meta.id;
+    const url = meta["@microsoft.graph.downloadUrl"];
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("閲覧履歴ファイルを取得できませんでした。");
+    const data = await response.json();
+    return data && typeof data === "object" ? data : { version: 1, items: {} };
+  } catch (err) {
+    if (/Graph APIエラー 404/.test(errorMessage(err))) {
+      state.remoteProgressItemId = null;
+      return { version: 1, items: {} };
+    }
+    throw err;
+  }
+}
+async function uploadProgressFile(data) {
+  const body = JSON.stringify(data);
+  const response = await graphRequest(`/me/drive/root:/${encodeURIComponent(CONFIG.PROGRESS_FILE)}:/content`, {
+    method: "PUT",
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+    body
+  });
+  const result = await response.json();
+  state.remoteProgressItemId = result.id || state.remoteProgressItemId;
+}
+function scheduleProgressSave(fileId) {
+  if (!fileId) return;
+  clearTimeout(state.saveTimer);
+  setProgressStatus("未保存の変更あり");
+  state.saveTimer = setTimeout(() => {
+    const scrollTop = $("markdown-viewer").scrollTop;
+    state.progress[fileId] = { scrollTop, updatedAt: new Date().toISOString() };
+    localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress));
+    queueProgressSave();
+  }, CONFIG.SAVE_DELAY);
+}
+function queueProgressSave() {
+  state.saveChain = state.saveChain.then(async () => {
+    if (!state.account) return;
+    setProgressStatus("同期中…");
+    try {
+      // 他端末で更新された履歴を先に取得してマージする
+      const remote = await downloadProgressFile();
+      const local = { version: 1, items: state.progress };
+      const merged = mergeProgress(remote, local);
+      await uploadProgressFile(merged);
+      state.progress = merged.items;
+      localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress));
+      setProgressStatus("同期済み");
+    } catch (err) {
+      console.error(err);
+      setProgressStatus("同期失敗（ローカル保存済み）");
+      showToast("閲覧位置のOneDrive同期に失敗しました。再接続後に再保存してください。", 6000);
+    }
+  }).catch(err => console.error("保存キューエラー", err));
+  return state.saveChain;
+}
+async function loadProgress() {
+  const backup = (() => {
+    try { return JSON.parse(localStorage.getItem("md_reader_progress_backup") || "{}"); }
+    catch (_) { return {}; }
+  })();
+  state.progress = backup;
+  const remote = await downloadProgressFile();
+  state.progress = mergeProgress(remote, { version: 1, items: backup }).items;
+  localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress));
+}
+
+/* =========================
+   アプリ起動
+   ========================= */
+async function startApp() {
+  $("sync-btn").disabled = false;
+  $("filter-input").disabled = false;
+  await loadProgress();
+  await loadFileIndex();
+  const cachedCount = state.files.length;
+
+  if (cachedCount) {
+    setListStatus(`保存済み一覧を表示中（${cachedCount.toLocaleString("ja-JP")} 件）。差分を確認します。`);
+  } else {
+    setListStatus("初回同期を開始します。ファイル数によって時間がかかります。");
+  }
+  await syncDrive();
+}
+async function flushProgress() {
+  clearTimeout(state.saveTimer);
+  if (state.currentFile) {
+    state.progress[state.currentFile.id] = {
+      scrollTop: $("markdown-viewer").scrollTop,
+      updatedAt: new Date().toISOString()
+    };
+    localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress));
+    await queueProgressSave();
+  }
+}
+
+/* =========================
+   イベント
+   ========================= */
+$("login-btn").addEventListener("click", login);
+$("logout-btn").addEventListener("click", logout);
+$("sync-btn").addEventListener("click", syncDrive);
+$("filter-input").addEventListener("input", applyFilter);
+$("more-btn").addEventListener("click", renderMoreFiles);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushProgress();
+});
+window.addEventListener("beforeunload", () => {
+  if (state.currentFile) {
+    state.progress[state.currentFile.id] = {
+      scrollTop: $("markdown-viewer").scrollTop,
+      updatedAt: new Date().toISOString()
+    };
+    try { localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress)); } catch (_) {}
+  }
+});
+
+(async function boot() {
+  try {
+    state.db = await openDatabase();
+    await initAuth();
+  } catch (err) {
+    console.error(err);
+    setListStatus("初期化エラー：" + errorMessage(err));
+    showToast("初期化に失敗しました：" + errorMessage(err), 8000);
+  }
+})();
+})();
+</script>
 </body>
 </html>
