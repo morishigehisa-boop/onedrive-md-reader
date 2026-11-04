@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OneDrive Markdown Reader v3.7.1</title>
+<title>OneDrive Markdown Reader v3.7.2</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js" integrity="sha384-JEyTNhjM6R1ElGoJns4U2Ln4ofPcqzSsynQkmEc/KGy6336qAZl70tDLufbkla+3" crossorigin="anonymous"></script>
@@ -64,7 +64,8 @@
   body[data-theme="dark"] #toc-resizer:hover::after,body[data-theme="dark"] #toc-resizer.dragging::after {background:#60a5fa}
   #toc-panel button {display:block;text-align:left;width:100%;padding:.28rem .4rem;border-radius:.3rem;color:#475569}
   #toc-panel button:hover {background:#e2e8f0}
-  #toc-panel button.toc-active {background:#dbeafe;color:#1d4ed8;font-weight:700}
+  #toc-panel button.toc-active {background:#dbeafe;color:#1d4ed8;font-weight:700;box-shadow:inset 3px 0 0 #2563eb}
+  #current-heading:not(:empty)::before {content:"▶ ";font-size:.7em}
   #reader-main {display:flex;flex-direction:column;min-width:0;flex:1;min-height:0}
   #reading-progress-track {height:4px;background:#e2e8f0;border-radius:9px;overflow:hidden;margin-bottom:.55rem}
   #reading-progress-fill {height:100%;width:0;background:#2563eb;transition:width .12s}
@@ -76,7 +77,8 @@
   body[data-theme="dark"] #toc-panel {border-color:#334155}
   body[data-theme="dark"] #toc-panel button {color:#cbd5e1}
   body[data-theme="dark"] #toc-panel button:hover {background:#334155}
-  body[data-theme="dark"] #toc-panel button.toc-active {background:#1e3a5f;color:#93c5fd}
+  body[data-theme="dark"] #toc-panel button.toc-active {background:#1e3a5f;color:#93c5fd;box-shadow:inset 3px 0 0 #60a5fa}
+  body[data-theme="dark"] #current-heading {color:#93c5fd}
   body[data-theme="dark"] #reading-progress-track {background:#334155}
   body[data-theme="dark"] #markdown-viewer mark.reader-highlight {background:#854d0e;color:#fef3c7}
   body[data-theme="dark"] #markdown-viewer mark.reader-note {background:transparent;color:inherit}
@@ -111,7 +113,7 @@
 <header class="bg-white border-b border-slate-200 px-4 py-3 flex flex-wrap gap-3 justify-between items-center shadow-sm">
   <div class="flex items-center gap-2">
     <h1 class="text-lg font-bold text-slate-800">📖 OneDrive Markdown Reader</h1>
-    <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded-full">v3.7.1</span>
+    <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded-full">v3.7.2</span>
   </div>
   <div class="flex items-center gap-3">
     <span id="account-label" class="text-xs text-slate-500"></span>
@@ -160,6 +162,7 @@
       <div class="min-w-0">
         <div id="current-file-name" class="font-bold text-slate-800 truncate"></div>
         <div id="current-file-path" class="text-xs text-slate-400 truncate"></div>
+        <div id="current-heading" class="text-xs text-blue-600 font-medium truncate" title="いま読んでいる見出し"></div>
       </div>
       <span id="progress-status" class="text-xs text-slate-500 whitespace-nowrap">閲覧位置</span>
     </div>
@@ -1536,6 +1539,7 @@ function buildTableOfContents(){
   const panel=$("toc-panel"), headings=[...$("markdown-viewer").querySelectorAll("h1,h2,h3,h4,h5,h6")];
   panel.innerHTML="";
   state.headings=headings; state.tocButtons=[]; state.tocCurrent=-1;
+  $("current-heading").textContent="";
   if(!headings.length){panel.innerHTML='<div class="text-slate-400 p-2">見出しはありません</div>';setupTocObserver([]);return;}
   headings.forEach((h,i)=>{
     h.id="reader-heading-"+i;
@@ -1553,6 +1557,8 @@ function setTocCurrent(i){
   if(i===state.tocCurrent)return;
   state.tocCurrent=i;
   state.tocButtons.forEach((b,k)=>b.classList.toggle("toc-active",k===i));
+  // 目次が見えないスマホ幅でも分かるよう、ヘッダーにも現在の見出しを出す
+  $("current-heading").textContent=i>=0?(state.headings[i]?.textContent.trim()||""):"";
   const btn=state.tocButtons[i], panel=$("toc-panel");
   if(btn && !panel.classList.contains("hidden")){
     // ページ全体を動かさず、目次パネルの中だけでスクロールする
@@ -1564,14 +1570,12 @@ function setTocCurrent(i){
 function setupTocObserver(headings){
   if(state.tocObserver){state.tocObserver.disconnect();state.tocObserver=null;}
   if(!headings.length||!("IntersectionObserver" in window))return;
-  const indexOf=new Map(headings.map((h,i)=>[h,i]));
-  // 画面上部15%の帯に見出しが入ったら「現在の見出し」とする
-  state.tocObserver=new IntersectionObserver(entries=>{
-    for(const e of entries){
-      const i=indexOf.get(e.target); if(i===undefined)continue;
-      if(e.isIntersecting)setTocCurrent(i);
-      else if(e.rootBounds && e.boundingClientRect.top>=e.rootBounds.top)setTocCurrent(i-1); // 上へ戻って帯の下に出た
-    }
+  // 見出しが画面上部15%の帯を出入りしたときだけ、現在の見出しを再計算する。
+  // （観測した初回通知で判定すると誤るため、判定は必ずsyncTocCurrentで行う）
+  let queued=false;
+  state.tocObserver=new IntersectionObserver(()=>{
+    if(queued)return; queued=true;
+    requestAnimationFrame(()=>{queued=false;syncTocCurrent();});
   },{root:$("markdown-viewer"),rootMargin:"0px 0px -85% 0px",threshold:0});
   headings.forEach(h=>state.tocObserver.observe(h));
 }
