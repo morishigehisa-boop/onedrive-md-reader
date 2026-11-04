@@ -3,7 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OneDrive Markdown Reader v3.7.2</title>
+<title>OneDrive Markdown Reader v3.8.0</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2563eb">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MD Reader">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js" integrity="sha384-JEyTNhjM6R1ElGoJns4U2Ln4ofPcqzSsynQkmEc/KGy6336qAZl70tDLufbkla+3" crossorigin="anonymous"></script>
@@ -30,6 +37,14 @@
   #markdown-viewer img.img-error {display:inline-block;padding:.3em .6em;border:1px dashed #cbd5e1;border-radius:4px;color:#94a3b8;font-size:.8em}
   #markdown-viewer a {color:#2563eb;text-decoration:underline}
   #markdown-viewer hr {border:0;border-top:1px solid #e2e8f0;margin:2em 0}
+  #markdown-viewer.font-mincho {font-family:"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP","Noto Serif CJK JP",serif}
+  #markdown-viewer.font-gothic {font-family:system-ui,-apple-system,"Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif}
+  body[data-theme="light"] #markdown-viewer.paper-sepia {background:#f4ecd8;color:#433422;border-radius:.4rem;padding-left:.5rem}
+  body[data-theme="light"] #markdown-viewer.paper-sepia h1,body[data-theme="light"] #markdown-viewer.paper-sepia h2,body[data-theme="light"] #markdown-viewer.paper-sepia h3,body[data-theme="light"] #markdown-viewer.paper-sepia h4 {color:#2e2214}
+  body[data-theme="light"] #markdown-viewer.paper-sepia blockquote,body[data-theme="light"] #markdown-viewer.paper-sepia th,body[data-theme="light"] #markdown-viewer.paper-sepia code {background:#eadfc3}
+  #markdown-viewer.vertical {writing-mode:vertical-rl;overflow-x:auto;overflow-y:hidden;max-width:none!important;width:100%;padding-right:0}
+  #markdown-viewer.vertical h1,#markdown-viewer.vertical h2,#markdown-viewer.vertical h3 {border:0;padding:0}
+  #markdown-viewer.vertical table,#markdown-viewer.vertical pre {writing-mode:horizontal-tb}
   .file-row.active {background:#eff6ff;border-color:#93c5fd}
   .group-heading {position:sticky;top:0;z-index:2;background:#f1f5f9;color:#475569;padding:.45rem .6rem;margin:.5rem 0 .2rem;border-radius:.45rem;font-size:.72rem;font-weight:700;display:flex;justify-content:space-between}
   body[data-theme="dark"] {background:#0b1220;color:#e2e8f0}
@@ -81,6 +96,38 @@
   body[data-theme="dark"] #current-heading {color:#93c5fd}
   body[data-theme="dark"] #reading-progress-track {background:#334155}
   body[data-theme="dark"] #markdown-viewer mark.reader-highlight {background:#854d0e;color:#fef3c7}
+  #markdown-viewer mark.reader-highlight.hl-green {background:#bbf7d0;color:#052e16}
+  #markdown-viewer mark.reader-highlight.hl-red {background:#fecaca;color:#450a0a}
+  #markdown-viewer mark.reader-highlight.hl-blue {background:#bfdbfe;color:#172554}
+  body[data-theme="dark"] #markdown-viewer mark.reader-highlight.hl-green {background:#166534;color:#dcfce7}
+  body[data-theme="dark"] #markdown-viewer mark.reader-highlight.hl-red {background:#991b1b;color:#fee2e2}
+  body[data-theme="dark"] #markdown-viewer mark.reader-highlight.hl-blue {background:#1e40af;color:#dbeafe}
+  #markdown-viewer mark.reader-find {background:#fed7aa;color:inherit;border-radius:2px;outline:1px solid #fdba74}
+  #markdown-viewer mark.reader-find.find-current {background:#fb923c;color:#1c1917;outline-color:#ea580c}
+  body[data-theme="dark"] #markdown-viewer mark.reader-find {background:#7c2d12;color:#ffedd5;outline-color:#9a3412}
+  body[data-theme="dark"] #markdown-viewer mark.reader-find.find-current {background:#ea580c;color:#fff}
+  #find-bar {display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin-bottom:.5rem;padding:.4rem;border:1px solid #e2e8f0;border-radius:.6rem;background:#f8fafc}
+  #find-bar.hidden {display:none}
+  #find-bar button {border:1px solid #cbd5e1;border-radius:.4rem;padding:.3rem .65rem;background:white;font-size:.8rem;min-height:36px}
+  body[data-theme="dark"] #find-bar {background:#172337;border-color:#334155}
+  body[data-theme="dark"] #find-bar button {background:#1e293b;color:#e2e8f0;border-color:#475569}
+  .read-badge {display:inline-block;font-size:10px;border-radius:999px;padding:0 .45rem;margin-top:.25rem;border:1px solid #cbd5e1;color:#64748b}
+  .read-badge.reading {color:#1d4ed8;border-color:#93c5fd;background:#eff6ff}
+  .read-badge.done {color:#047857;border-color:#6ee7b7;background:#ecfdf5}
+  body[data-theme="dark"] .read-badge.reading {background:#1e3a5f;color:#93c5fd;border-color:#3b82f6}
+  body[data-theme="dark"] .read-badge.done {background:#064e3b;color:#6ee7b7;border-color:#059669}
+  #sel-menu {position:fixed;z-index:50;display:flex;gap:.25rem;align-items:center;padding:.3rem;border-radius:.6rem;background:#1e293b;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+  #sel-menu.hidden {display:none}
+  #sel-menu button {min-width:40px;min-height:40px;border-radius:.45rem;border:0;background:transparent;color:#f8fafc;font-size:.8rem;padding:0 .5rem}
+  #sel-menu button:active {background:#334155}
+  #sel-menu .sep {width:1px;align-self:stretch;background:#475569}
+  #all-ann {position:fixed;inset:0;z-index:55;background:rgba(0,0,0,.5);display:flex;align-items:flex-start;justify-content:center;padding:.75rem}
+  #all-ann.hidden {display:none}
+  #all-ann-box {width:100%;max-width:44rem;max-height:calc(100dvh - 1.5rem);display:flex;flex-direction:column;background:white;color:#1e293b;border-radius:.8rem;padding:.8rem}
+  body[data-theme="dark"] #all-ann-box {background:#111c2e;color:#e2e8f0}
+  #all-ann-list {overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch}
+  .all-ann-row {border-top:1px solid #e2e8f0;padding:.55rem 0;font-size:.8rem}
+  body[data-theme="dark"] .all-ann-row {border-color:#334155}
   body[data-theme="dark"] #markdown-viewer mark.reader-note {background:transparent;color:inherit}
   body[data-theme="dark"] #markdown-viewer blockquote {background:#1e293b}
   body[data-theme="dark"] #markdown-viewer img.img-error {border-color:#475569}
@@ -113,11 +160,14 @@
 <header class="bg-white border-b border-slate-200 px-4 py-3 flex flex-wrap gap-3 justify-between items-center shadow-sm">
   <div class="flex items-center gap-2">
     <h1 class="text-lg font-bold text-slate-800">📖 OneDrive Markdown Reader</h1>
-    <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded-full">v3.7.2</span>
+    <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded-full">v3.8.0</span>
   </div>
   <div class="flex items-center gap-3">
+    <span id="offline-badge" class="hidden text-xs rounded-full border border-amber-400 bg-amber-50 text-amber-700 px-2 py-1">オフライン</span>
     <span id="account-label" class="text-xs text-slate-500"></span>
     <button id="login-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Microsoft ログイン</button>
+<button id="resume-btn" class="hidden border border-blue-300 text-blue-700 hover:bg-blue-50 px-3 py-2 rounded-lg text-sm" type="button">▶ 続きを読む</button>
+    <button id="all-ann-btn" class="border border-slate-300 hover:bg-slate-100 px-3 py-2 rounded-lg text-sm" type="button" title="全文書のマーカー・メモ・しおりを検索">📚 全注釈</button>
     <button id="theme-btn" class="border border-slate-300 hover:bg-slate-100 px-3 py-2 rounded-lg text-sm" type="button">🌙 ダーク</button>
     <button id="logout-btn" class="hidden border border-slate-300 hover:bg-slate-100 px-3 py-2 rounded-lg text-sm">ログアウト</button>
   </div>
@@ -127,7 +177,8 @@
   <aside id="library-pane" class="w-full md:w-96 md:flex-shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[42dvh] md:h-[calc(100dvh-6.5rem)]">
     <div class="flex justify-between items-center mb-3">
       <h2 id="list-title" class="text-sm font-bold text-slate-700">登録済み Markdown</h2>
-      <button id="sync-btn" class="text-xs text-blue-700 hover:underline disabled:text-slate-400" disabled>一覧を同期</button>
+      <span class="flex gap-3"><button id="offline-save-btn" type="button" class="text-xs text-blue-700 hover:underline" title="登録済み文書の本文を端末に保存し、通信なしでも読めるようにします">📥 オフライン保存</button>
+      <button id="sync-btn" class="text-xs text-blue-700 hover:underline disabled:text-slate-400" disabled>一覧を同期</button></span>
     </div>
     <div class="flex gap-2 mb-2">
       <button id="show-registered-btn" class="flex-1 rounded-lg border px-2 py-2 text-xs bg-blue-50 border-blue-200 text-blue-700" disabled>登録済み</button>
@@ -172,7 +223,16 @@
       <label class="text-xs">文字 <select id="font-size-select"><option value="14">小</option><option value="15" selected>標準</option><option value="17">大</option><option value="19">特大</option></select></label>
       <label class="text-xs">行間 <select id="line-height-select"><option value="1.5">狭い</option><option value="1.75">標準</option><option value="2">広い</option><option value="2.2">ゆったり</option></select></label>
       <label class="text-xs">本文幅 <select id="content-width-select"><option value="100%">広い</option><option value="900px" selected>標準</option><option value="700px">狭い</option></select></label>
+      <label class="text-xs">書体 <select id="font-family-select"><option value="default">標準</option><option value="gothic">ゴシック</option><option value="mincho">明朝</option></select></label>
+      <label class="text-xs">背景 <select id="paper-select" title="セピアはライトテーマのときに有効"><option value="plain">標準</option><option value="sepia">セピア</option></select></label>
+      <label class="text-xs">向き <select id="writing-select"><option value="horizontal">横書き</option><option value="vertical">縦書き</option></select></label>
+      <label class="text-xs">タップ送り <select id="tap-paging-select" title="画面の左右端をタップしてページ送り"><option value="off">なし</option><option value="on">あり</option></select></label>
+      <button id="page-prev-btn" type="button" title="前のページ（Shift+Space / K）">▲ 前頁</button>
+      <button id="page-next-btn" type="button" title="次のページ（Space / J）">▼ 次頁</button>
+      <button id="find-toggle" type="button" title="本文内を検索（/ キー）">🔍 本文検索</button>
+      <button id="read-toggle" type="button" title="この文書の読了／未読を切り替え">✓ 読了にする</button>
       <button id="focus-toggle" type="button">集中モード</button>
+      <select id="marker-color-select" title="マーカーの色" aria-label="マーカーの色"><option value="yellow">🟡 黄</option><option value="green">🟢 緑</option><option value="red">🔴 赤</option><option value="blue">🔵 青</option></select>
       <button id="highlight-btn" type="button">🖍 マーカー</button>
       <button id="note-btn" type="button">✎ メモ</button>
       <button id="bookmark-btn" type="button">☆ しおり</button>
@@ -187,6 +247,11 @@
       <nav id="toc-panel" class="hidden" aria-label="目次"><div class="text-slate-400 p-2">見出しはありません</div></nav>
       <div id="toc-resizer" role="separator" aria-label="目次の幅を変更" aria-orientation="vertical" aria-valuemin="140" aria-valuemax="420" tabindex="0" title="ドラッグして目次の幅を変更"></div>
       <div id="reader-main">
+        <div id="find-bar" class="hidden" role="search">
+          <input id="find-input" type="search" placeholder="本文内を検索（Enterで次へ）" class="border rounded-lg px-2 py-1 text-sm min-w-0 flex-1" autocomplete="off">
+          <span id="find-count" class="text-xs text-slate-500 whitespace-nowrap"></span>
+          <button id="find-prev" type="button" aria-label="前の一致">↑</button><button id="find-next" type="button" aria-label="次の一致">↓</button><button id="find-close" type="button" aria-label="検索を閉じる">×</button>
+        </div>
         <div id="annotations-panel" class="hidden border rounded-lg p-2 mb-2 max-h-40 overflow-y-auto text-xs"></div>
         <div id="markdown-viewer" class="overflow-y-auto flex-1 min-h-0 pr-2">
           <div class="text-center py-20 text-slate-400"><p class="text-lg mb-2">Markdownファイルを選択してください。</p><p class="text-sm">閲覧位置はファイルごとに自動保存されます。</p></div>
@@ -196,6 +261,22 @@
   </section>
 </main>
 
+<div id="sel-menu" class="hidden" role="toolbar" aria-label="選択した文章の操作">
+  <button type="button" data-color="yellow" aria-label="黄色のマーカー">🟡</button><button type="button" data-color="green" aria-label="緑のマーカー">🟢</button><button type="button" data-color="red" aria-label="赤のマーカー">🔴</button><button type="button" data-color="blue" aria-label="青のマーカー">🔵</button>
+  <span class="sep"></span><button type="button" data-act="note">✎ メモ</button><button type="button" data-act="copy">コピー</button>
+</div>
+<div id="all-ann" class="hidden" role="dialog" aria-modal="true" aria-label="全文書の注釈">
+  <div id="all-ann-box">
+    <div class="flex items-center justify-between mb-2"><h2 class="font-bold text-sm">📚 全文書の注釈</h2><button id="all-ann-close" type="button" class="border rounded-lg px-3 py-2 text-xs">閉じる</button></div>
+    <div class="flex flex-wrap gap-2 mb-2">
+      <input id="all-ann-q" type="search" placeholder="引用・メモ・文書名で検索" class="border rounded-lg px-2 py-2 text-sm min-w-0 flex-1">
+      <select id="all-ann-type" class="border rounded-lg px-2 py-2 text-xs"><option value="all">すべて</option><option value="highlight">マーカー</option><option value="note">メモ</option><option value="bookmark">しおり</option></select>
+      <select id="all-ann-color" class="border rounded-lg px-2 py-2 text-xs"><option value="all">全色</option><option value="yellow">黄</option><option value="green">緑</option><option value="red">赤</option><option value="blue">青</option></select>
+    </div>
+    <div id="all-ann-count" class="text-xs text-slate-500 mb-1"></div>
+    <div id="all-ann-list"></div>
+  </div>
+</div>
 <div id="modal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="modal-title">
   <div id="modal-box" class="w-full max-w-md rounded-xl shadow-xl p-4">
     <div id="modal-title" class="font-bold mb-2"></div>
@@ -473,8 +554,14 @@ async function initAuth() {
   }
 
   if (state.account) {
-    await acquireToken();
+    // 通信できない起動時は、端末に保存済みの一覧・本文・読書履歴だけで立ち上げる
+    if (navigator.onLine === false) state.offline = true;
+    else {
+      try { await acquireToken(); }
+      catch (err) { if (err instanceof TypeError) state.offline = true; else throw err; }
+    }
     setLoggedInUI();
+    setOfflineUI();
     await startApp();
   }
 }
@@ -514,6 +601,41 @@ async function acquireToken() {
 async function logout() {
   if (!state.msal || !state.account) return;
   await state.msal.logoutRedirect({ account: state.account });
+}
+/* ---- オフライン対応 ---- */
+function setOfflineUI() { $("offline-badge").classList.toggle("hidden", !(state.offline || navigator.onLine === false)); }
+async function goOnline() {
+  setOfflineUI();
+  if (!state.account) return;
+  try { await acquireToken(); } catch (_) { return; }
+  if (state.offline) {
+    state.offline = false; setOfflineUI();
+    showToast("オンラインに戻りました。同期します。", 3000);
+    try { await syncDrive(); } catch (err) { console.warn(err); }
+    startProgressSync();
+  } else if (state.progressDirty) queueProgressSave();
+}
+async function getCachedText(file) { // 版を問わず、保存済みの本文を返す（なければnull）
+  const mem = state.fullTextCache.get(file.id);
+  if (mem) return mem.text;
+  try { const rec = await idbGet("fulltext", file.id); return rec ? rec.text : null; } catch (_) { return null; }
+}
+const isNetworkFailure = err => err instanceof TypeError || navigator.onLine === false || (err instanceof GraphError && (err.status === 0 || err.status >= 500));
+async function saveRegisteredOffline() {
+  const files = state.registeredFiles.filter(f => !f.isMissing), total = files.length;
+  if (!total) return showToast("登録済みの文書がありません。");
+  if (navigator.onLine === false || state.offline) return showToast("オフラインのため保存できません。");
+  const box = $("fulltext-results"); box.classList.remove("hidden");
+  let cursor = 0, done = 0, fail = 0;
+  const worker = async () => {
+    while (cursor < total) {
+      const f = files[cursor++];
+      try { await getFullText(f); } catch (_) { fail++; }
+      box.textContent = `オフライン用に保存中… ${++done}/${total}`;
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONFIG.SEARCH_CONCURRENCY, total) }, worker));
+  box.textContent = `${total - fail} 件の本文を端末に保存しました${fail ? `（${fail} 件は失敗）` : ""}。画像は保存されません。`;
 }
 function setLoggedInUI() {
   $("login-btn").classList.add("hidden");
@@ -760,7 +882,8 @@ function listSignature() {
   return JSON.stringify([
     Object.entries(regs).filter(([, r]) => r && r.enabled).map(([id, r]) => [id, r.groupId || "", r.name || "", r.path || ""]).sort(),
     (state.progress.__groups || []).map(g => [g.id, g.name, !!g.deleted]).sort(),
-    Object.entries(tags).map(([id, t]) => [id, (t.tags || []).join(",")]).sort()
+    Object.entries(tags).map(([id, t]) => [id, (t.tags || []).join(",")]).sort(),
+    Object.keys(regs).map(id => [id, readState(id).code]).sort()
   ]);
 }
 /* 同期後の一覧更新：変化があるときだけ再描画し、スクロール位置を保つ */
@@ -795,6 +918,7 @@ function applyFilter(keepScroll = false) {
   renderMoreFiles();
   while (state.rendered < Math.min(prevRendered, state.filtered.length)) renderMoreFiles();
   if (keepScroll) list.scrollTop = prevTop;
+  updateResumeButton();
 }
 function setListMode(mode) {
   state.listMode = mode;
@@ -859,6 +983,13 @@ function renderMoreFiles() {
     path.className = "text-[10px] text-slate-400 break-all mt-1";
     path.textContent = file.path;
     open.append(name, path);
+    const rs = readState(file.id);
+    if (rs.code !== "u") {
+      const badge = document.createElement("span");
+      badge.className = "read-badge " + (rs.code === "d" ? "done" : "reading");
+      badge.textContent = rs.code === "d" ? "✓ 読了" : "読書中 " + rs.pct + "%";
+      open.appendChild(badge);
+    }
     const tags = state.progress.__fileTags?.[file.id]?.tags || [];
     if (tags.length) {
       const tagWrap = document.createElement("div");
@@ -1030,11 +1161,21 @@ async function openFile(file) {
 
   try {
     if (!file.id) throw new Error("ファイルIDがありません。OneDrive一覧を再同期してください。");
-    const response = await downloadDriveItem(file.id, signal);
-    if (!response.ok) throw new Error("本文のダウンロードに失敗しました（" + response.status + "）。");
-    const markdown = await response.text();
-    if (requestId !== state.openRequest) return;
-    cacheFullText(file, markdown);
+    let markdown, fromCache = false;
+    try {
+      if (state.offline) throw new TypeError("offline");
+      const response = await downloadDriveItem(file.id, signal);
+      if (!response.ok) throw new Error("本文のダウンロードに失敗しました（" + response.status + "）。");
+      markdown = await response.text();
+      if (requestId !== state.openRequest) return;
+      cacheFullText(file, markdown);
+    } catch (err) {
+      if (err.name === "AbortError") throw err;
+      const cached = isNetworkFailure(err) ? await getCachedText(file) : null;
+      if (cached === null) throw (state.offline ? new Error("この文書はまだ端末に保存されていません。オンラインで一度開くか「オフライン保存」を行ってください。") : err);
+      markdown = cached; fromCache = true;
+      if (requestId !== state.openRequest) return;
+    }
 
     const rawHtml = marked.parse(markdown, { gfm: true, breaks: false });
     const cleanHtml = DOMPurify.sanitize(rawHtml, {
@@ -1048,6 +1189,7 @@ async function openFile(file) {
 
     prepareMarkdownBlocks();
     buildTableOfContents();
+    state.find.groups=[]; state.find.cur=-1; $("find-count").textContent="";
     applySavedAnnotations(file.id);
     applyReaderSettings();
     if (relativeImages.length) {
@@ -1056,7 +1198,7 @@ async function openFile(file) {
     }
     await waitForLayoutStable(viewer);
     if (requestId !== state.openRequest) return;
-    await pollRemoteProgress(true);
+    if (!state.offline && navigator.onLine !== false) await pollRemoteProgress(true).catch(() => {});
     if (requestId !== state.openRequest) return;
     const saved = state.progress[file.id];
     state.suppressScrollUntil = Date.now() + 900;
@@ -1066,8 +1208,10 @@ async function openFile(file) {
     updateReadingProgress();
     syncTocCurrent();
     renderAnnotations();
-    setProgressStatus(saved ? "閲覧位置を復元しました" : "新規ファイル");
+    setProgressStatus((saved ? "閲覧位置を復元しました" : "新規ファイル") + (fromCache ? "（端末に保存済みの本文）" : ""));
     state.viewerReady = true;
+    updateReadButton(); updateResumeButton();
+    if (!$("find-bar").classList.contains("hidden") && $("find-input").value) runFind(false);
   } catch (err) {
     if (err.name === "AbortError") return;
     console.error(err);
@@ -1112,10 +1256,17 @@ function prepareMarkdownBlocks() {
   state.blocks = blocks;
   state.blocksByFp = byFp;
 }
+/* 縦書きでは左右方向にスクロールするため、向きに依らず「読み進めた量」で扱う */
+const isVertical=()=>$("markdown-viewer").classList.contains("vertical");
+function scrollMax(v){return isVertical()?v.scrollWidth-v.clientWidth:v.scrollHeight-v.clientHeight;}
+function getScrollPos(v){return isVertical()?-v.scrollLeft:v.scrollTop;}
+function setScrollPos(v,x){x=Math.max(0,Math.min(x,Math.max(0,scrollMax(v)))); if(isVertical())v.scrollLeft=-x; else v.scrollTop=x;}
+function scrollRatioOf(v){const m=scrollMax(v);return m>0?Math.max(0,Math.min(1,getScrollPos(v)/m)):0;}
 function captureReadingPosition() {
   const viewer=$("markdown-viewer"), blocks=state.blocks;
-  const ratio=viewer.scrollHeight>viewer.clientHeight?viewer.scrollTop/(viewer.scrollHeight-viewer.clientHeight):0;
-  if(!blocks.length)return {scrollTop:viewer.scrollTop,scrollRatio:ratio};
+  const ratio=scrollRatioOf(viewer);
+  const fits=scrollMax(viewer)<=2;
+  if(!blocks.length||isVertical())return {scrollTop:viewer.scrollTop,scrollRatio:ratio,fits};
   const vr=viewer.getBoundingClientRect(), targetY=vr.top+Math.min(90,viewer.clientHeight*.15);
   // 文書順に並んだブロックから、上端が基準線以上にある最後のブロックを二分探索
   let lo=0, hi=blocks.length-1, idx=-1;
@@ -1130,11 +1281,12 @@ function captureReadingPosition() {
     blockProgress:rect.height>0?Math.max(0,Math.min(1,(targetY-rect.top)/rect.height)):0,
     viewportFraction:viewer.clientHeight?Math.min(.2,90/viewer.clientHeight):.1,
     scrollTop:viewer.scrollTop,
-    scrollRatio:ratio
+    scrollRatio:ratio, fits
   };
 }
 function restoreReadingPosition(saved) {
-  const viewer=$("markdown-viewer"); if(!saved){viewer.scrollTop=0;return;}
+  const viewer=$("markdown-viewer"); if(!saved){setScrollPos(viewer,0);return;}
+  if(isVertical()){setScrollPos(viewer,scrollMax(viewer)*Math.max(0,Math.min(1,Number(saved.scrollRatio)||0)));return;}
   const blocks=state.blocks; let target=null;
   if(saved.blockFingerprint && blocks.length){
     let candidates=state.blocksByFp.get(saved.blockFingerprint)||[];
@@ -1270,9 +1422,22 @@ async function uploadProgressFile(data, snapshot) {
   }
   return graphRequest(url, { method: "PUT", headers, body });
 }
+/* 読了状態：どこまで読んだか(maxRatio)と手動の読了(done)を位置データに持たせる */
+function readState(fileId){
+  const r=state.progress[fileId]; if(!r||typeof r!=="object")return {code:"u",pct:0};
+  const m=Math.max(0,Math.min(1,Number(r.maxRatio ?? r.scrollRatio)||0));
+  if(r.done===true||m>=.97)return {code:"d",pct:100};
+  if(m>=.02)return {code:"r",pct:Math.round(m*100)};
+  return {code:"u",pct:0};
+}
 function markLocalProgress(fileId, position) {
   if (!fileId) return;
-  state.progress[fileId] = { ...(typeof position === "object" ? position : {scrollTop:position}), updatedAt: new Date().toISOString() };
+  const prev = state.progress[fileId] || {}, before = readState(fileId).code;
+  const pos = typeof position === "object" ? position : {scrollTop:position};
+  const ratio = pos.fits ? 1 : (Number(pos.scrollRatio) || 0); // 1画面に収まる短い文書は開いた時点で読了扱い
+  state.progress[fileId] = { ...pos, maxRatio: Math.max(Number(prev.maxRatio)||0, ratio), ...(prev.done === true ? {done:true} : {}), updatedAt: new Date().toISOString() };
+  delete state.progress[fileId].fits;
+  if (readState(fileId).code !== before) { applyFilter(true); updateReadButton(); updateResumeButton(); }
   state.localRevision++;
   state.pendingLocalFileIds.add(fileId);
   state.progressDirty = true;
@@ -1439,7 +1604,7 @@ async function loadProgress() {
   } catch (err) {
     // 取得に失敗しても端末内のバックアップで起動する（保存時に改めてマージされる）
     console.warn(err);
-    showToast("OneDriveの読書履歴を取得できませんでした。端末内のデータで開始します。" + describeError(err), 8000);
+    if (!state.offline) showToast("OneDriveの読書履歴を取得できませんでした。端末内のデータで開始します。" + describeError(err), 8000);
   }
   const merged = mergeProgress(remote, backupDoc);
   state.progress = fromProgressDocument(merged);
@@ -1469,8 +1634,10 @@ async function startApp() {
   } else {
     setListStatus("初回同期を開始します。ファイル数によって時間がかかります。");
   }
+  if (state.offline) { setListStatus("オフラインです。保存済みの一覧と本文を表示しています。"); return; }
   await syncDrive();
   startProgressSync();
+  try { navigator.storage?.persist?.(); } catch (_) {} // 端末の容量不足時に保存済みデータが消されにくくする
 }
 async function flushProgress() {
   clearTimeout(state.saveTimer);
@@ -1490,7 +1657,18 @@ function applyReaderSettings(){
   $("font-size-select").value=String(cfg.fontSize||15);
   $("line-height-select").value=String(cfg.lineHeight||1.75);
   $("content-width-select").value=cfg.contentWidth||"900px";
-  const viewer=$("markdown-viewer"); viewer.style.fontSize=(cfg.fontSize||15)+"px"; viewer.style.lineHeight=String(cfg.lineHeight||1.75); viewer.style.maxWidth=cfg.contentWidth||"900px";
+  $("font-family-select").value=cfg.fontFamily||"default";
+  $("paper-select").value=cfg.paper||"plain";
+  $("writing-select").value=cfg.writing||"horizontal";
+  $("tap-paging-select").value=cfg.tapPaging||"off";
+  const viewer=$("markdown-viewer");
+  viewer.classList.toggle("font-mincho",cfg.fontFamily==="mincho");
+  viewer.classList.toggle("font-gothic",cfg.fontFamily==="gothic");
+  viewer.classList.toggle("paper-sepia",cfg.paper==="sepia");
+  viewer.classList.toggle("vertical",cfg.writing==="vertical");
+  $("page-prev-btn").textContent=cfg.writing==="vertical"?"▶ 前頁":"▲ 前頁";
+  $("page-next-btn").textContent=cfg.writing==="vertical"?"◀ 次頁":"▼ 次頁";
+  state.tapPaging=cfg.tapPaging==="on"; viewer.style.fontSize=(cfg.fontSize||15)+"px"; viewer.style.lineHeight=String(cfg.lineHeight||1.75); viewer.style.maxWidth=cfg.contentWidth||"900px";
 }
 /* ---- 表示の幅・文字サイズが変わっても、画面最上部の行を動かさない ---- */
 function anchorTopOf(node,offset){
@@ -1515,10 +1693,17 @@ function captureTopAnchor(){
   return {node,offset,delta:anchorTopOf(node,offset)-r.top};
 }
 function keepTopAnchor(change){
-  const a=state.viewerReady?captureTopAnchor():null;
+  const v=$("markdown-viewer"), r0=state.viewerReady?scrollRatioOf(v):null;
+  const a=(!isVertical()&&state.viewerReady)?captureTopAnchor():null;
   change();
-  if(!a)return;
-  const v=$("markdown-viewer");
+  if(isVertical()){ // 縦書き（への切替）は、行ではなく読み進めた割合で位置を保つ
+    if(r0===null)return;
+    state.suppressScrollUntil=Date.now()+600; state.restoringPosition=true;
+    const fix=()=>setScrollPos(v,scrollMax(v)*r0);
+    fix(); requestAnimationFrame(()=>{fix();requestAnimationFrame(()=>{state.restoringPosition=false;updateReadingProgress();syncTocCurrent();});});
+    return;
+  }
+  if(!a){ if(r0!==null&&v.scrollTop===0&&r0>0){setScrollPos(v,scrollMax(v)*r0);} return; } // 縦書き→横書きの戻し
   const fix=()=>{ if(!a.node.isConnected)return; v.scrollTop+=anchorTopOf(a.node,a.offset)-(v.getBoundingClientRect().top+a.delta); };
   state.suppressScrollUntil=Date.now()+600; state.restoringPosition=true;
   fix();
@@ -1528,8 +1713,35 @@ function keepTopAnchor(change){
     if(state.currentFile&&state.viewerReady){state.lastLocalInteractionAt=Date.now();scheduleProgressSave(state.currentFile.id);}
   }); });
 }
+/* ---- ページ送り（キー・ボタン・画面端タップ） ---- */
+function pageScroll(dir){ // dir: +1 次 / -1 前
+  const v=$("markdown-viewer"); if(!state.currentFile)return;
+  const vert=isVertical(), step=(vert?v.clientWidth:v.clientHeight)*.9*dir;
+  state.lastLocalInteractionAt=Date.now();
+  if(vert)v.scrollBy({left:-step,behavior:"smooth"}); else v.scrollBy({top:step,behavior:"smooth"});
+}
+function handlePagingKey(e){
+  if(e.ctrlKey||e.metaKey||e.altKey)return;
+  const t=e.target, tag=t&&t.tagName;
+  if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(t&&t.isContentEditable))return;
+  if(!$("modal").classList.contains("hidden")||!$("all-ann").classList.contains("hidden"))return;
+  if(tag==="BUTTON"&&(e.key===" "||e.key==="Enter"))return; // ボタン操作を優先
+  let dir=0;
+  if(e.key===" ")dir=e.shiftKey?-1:1; else if(e.key==="j"||e.key==="J"||e.key==="PageDown")dir=1; else if(e.key==="k"||e.key==="K"||e.key==="PageUp")dir=-1;
+  if(!dir)return;
+  e.preventDefault(); pageScroll(dir);
+}
+function handleTapPaging(e){
+  if(!state.tapPaging||!state.currentFile)return;
+  if(e.target.closest("a,button,mark,input,textarea,select,img,summary"))return;
+  const sel=window.getSelection(); if(sel&&!sel.isCollapsed)return;
+  const v=$("markdown-viewer"), r=v.getBoundingClientRect(), x=(e.clientX-r.left)/r.width;
+  const vert=isVertical();
+  if(x<.2)pageScroll(vert?1:-1); else if(x>.8)pageScroll(vert?-1:1);
+}
 function saveReaderSettings(){
-  const cfg={fontSize:Number($("font-size-select").value),lineHeight:Number($("line-height-select").value),contentWidth:$("content-width-select").value};
+  const cfg={fontSize:Number($("font-size-select").value),lineHeight:Number($("line-height-select").value),contentWidth:$("content-width-select").value,
+    fontFamily:$("font-family-select").value,paper:$("paper-select").value,writing:$("writing-select").value,tapPaging:$("tap-paging-select").value};
   try{localStorage.setItem("md_reader_settings",JSON.stringify(cfg));}catch(_){}
   keepTopAnchor(applyReaderSettings);
 }
@@ -1582,14 +1794,16 @@ function setupTocObserver(headings){
 /* 位置ジャンプ後など、観測が追いつかない場面で現在の見出しを1回計算する */
 function syncTocCurrent(){
   if(!state.headings.length)return;
-  const viewer=$("markdown-viewer"), threshold=viewer.getBoundingClientRect().top+viewer.clientHeight*.15;
+  const viewer=$("markdown-viewer"), vr=viewer.getBoundingClientRect(), vert=isVertical();
+  const threshold=vert?vr.right-viewer.clientWidth*.15:vr.top+viewer.clientHeight*.15;
   let cur=-1;
   for(let i=0;i<state.headings.length;i++){
-    if(state.headings[i].getBoundingClientRect().top<=threshold)cur=i; else break;
+    const rc=state.headings[i].getBoundingClientRect();
+    if(vert?rc.right>=threshold:rc.top<=threshold)cur=i; else break;
   }
   setTocCurrent(cur);
 }
-function updateReadingProgress(){const v=$("markdown-viewer"),max=v.scrollHeight-v.clientHeight;$("reading-progress-fill").style.width=(max>0?Math.max(0,Math.min(100,v.scrollTop/max*100)):0)+"%";}
+function updateReadingProgress(){$("reading-progress-fill").style.width=(scrollRatioOf($("markdown-viewer"))*100)+"%";}
 
 /* ---- 注釈（ハイライト・メモ・しおり） ---- */
 function annotationList(fileId){state.progress.__annotations=state.progress.__annotations||{};return state.progress.__annotations[fileId]||(state.progress.__annotations[fileId]=[]);}
@@ -1673,12 +1887,14 @@ function wrapTextRange(nodes,startPos,endPos,id,className){
   return wrapped>0;
 }
 /* 1件の注釈を本文に反映。位置が見つからなければfalse（注釈一覧に「位置不明」と表示） */
+const MARKER_COLORS={yellow:"黄",green:"緑",red:"赤",blue:"青"};
+const colorClass=c=>(c&&c!=="yellow"&&MARKER_COLORS[c])?" hl-"+c:"";
 function applyOneAnnotation(a){
   const root=$("markdown-viewer");
   const {nodes,full}=collectTextNodes(root);
   const found=findAnnotationRange(full,a);
   if(!found)return false;
-  return wrapTextRange(nodes,found.index,found.index+found.length,a.id,a.type==="note"?"reader-note":"reader-highlight");
+  return wrapTextRange(nodes,found.index,found.index+found.length,a.id,a.type==="note"?"reader-note":"reader-highlight"+colorClass(a.color));
 }
 function applySavedAnnotations(fileId){
   state.orphanIds.clear();
@@ -1695,11 +1911,12 @@ function removeAnnotationMarks(id){
     parent.removeChild(m); parent.normalize();
   });
 }
-function addHighlight(){
+function addHighlight(color){
   if(!state.currentFile)return showToast("先にMarkdownファイルを開いてください。");
+  color=MARKER_COLORS[color]?color:$("marker-color-select").value;
   const info=captureSelectionInfo();
   if(!info)return showToast("マーカーを付ける文章を選択してください。");
-  const item={id:"a_"+crypto.randomUUID(),type:"highlight",...info,updatedAt:new Date().toISOString()};
+  const item={id:"a_"+crypto.randomUUID(),type:"highlight",color,...info,updatedAt:new Date().toISOString()};
   persistAnnotation(state.currentFile.id,item);
   if(!applyOneAnnotation(item))state.orphanIds.add(item.id);
   state.lastSel=null; window.getSelection()?.removeAllRanges();
@@ -1738,6 +1955,180 @@ function deleteAnnotation(fileId,id){
   removeAnnotationMarks(id); state.orphanIds.delete(id);
   markProgressChanged(); queueProgressSave(); renderAnnotations();
 }
+/* ---- 読了の手動切替 ---- */
+function updateReadButton(){
+  const b=$("read-toggle"); if(!state.currentFile){b.disabled=true;return;}
+  b.disabled=false; b.textContent=readState(state.currentFile.id).code==="d"?"↺ 未読に戻す":"✓ 読了にする";
+}
+function toggleReadDone(){
+  if(!state.currentFile||!state.viewerReady)return;
+  const id=state.currentFile.id;
+  if(!state.progress[id])markLocalProgress(id,captureReadingPosition());
+  const rec=state.progress[id];
+  if(readState(id).code==="d"){ delete rec.done; rec.maxRatio=0; } else { rec.done=true; }
+  rec.updatedAt=new Date().toISOString();
+  state.localRevision++; state.pendingLocalFileIds.add(id); state.progressDirty=true; persistLocalProgress(); queueProgressSave();
+  applyFilter(true); updateReadButton(); updateResumeButton();
+  showToast(readState(id).code==="d"?"読了にしました。":"未読に戻しました。",1800);
+}
+/* ---- 続きを読む：最後に読んだ未読了の文書へ1タップで ---- */
+function resumeCandidate(){
+  let best=null,bt=0;
+  for(const [id,r] of Object.entries(state.progress)){
+    if(id.startsWith("__")||!r||typeof r!=="object"||!r.updatedAt)continue;
+    const t=Date.parse(r.updatedAt)||0; if(t<=bt)continue;
+    const f=fileById(id); if(!f||f.isMissing||readState(id).code==="d")continue;
+    best=f;bt=t;
+  }
+  return best;
+}
+function updateResumeButton(){
+  const f=resumeCandidate(), b=$("resume-btn");
+  const show=!!f&&state.currentFile?.id!==f.id;
+  b.classList.toggle("hidden",!show);
+  if(show){b.dataset.fileId=f.id;b.title="「"+f.name+"」を前回の位置から開く（"+readState(f.id).pct+"%）";}
+}
+/* ---- 本文内検索 ---- */
+const FIND_LIMIT=1000;
+function clearFindMarks(){
+  const v=$("markdown-viewer");
+  v.querySelectorAll("mark.reader-find").forEach(m=>{const p=m.parentNode;if(!p)return;while(m.firstChild)p.insertBefore(m.firstChild,m);p.removeChild(m);p.normalize();});
+  state.find.groups=[]; state.find.cur=-1;
+}
+function runFind(jump=true){
+  clearFindMarks();
+  const q=$("find-input").value, count=$("find-count");
+  if(!q||!state.currentFile){count.textContent="";return;}
+  const {nodes,full}=collectTextNodes($("markdown-viewer"));
+  const hay=full.toLocaleLowerCase(), needle=q.toLocaleLowerCase();
+  if(hay.length!==full.length){count.textContent="検索できません";return;} // 大文字小文字変換で長さが変わる特殊文字
+  const hits=[]; let from=0;
+  while(hits.length<FIND_LIMIT&&(from=hay.indexOf(needle,from))!==-1){hits.push(from);from+=needle.length;}
+  // 後ろから順に包む（前の位置が崩れない）
+  for(let i=hits.length-1;i>=0;i--)wrapTextRange(nodes,hits[i],hits[i]+needle.length,"find-"+i,"reader-find");
+  const groups=[];
+  $("markdown-viewer").querySelectorAll('mark[data-annotation-id^="find-"]').forEach(m=>{
+    const i=Number(m.dataset.annotationId.slice(5)); delete m.dataset.annotationId; m.dataset.findIndex=i;
+    (groups[i]=groups[i]||[]).push(m);
+  });
+  state.find.groups=groups.filter(Boolean);
+  if(!state.find.groups.length){count.textContent="見つかりません";return;}
+  stepFind(0,jump,true);
+}
+function stepFind(dir,jump=true,first=false){
+  const g=state.find.groups; if(!g.length)return;
+  if(state.find.cur>=0)g[state.find.cur]?.forEach(m=>m.classList.remove("find-current"));
+  state.find.cur=first?0:(state.find.cur+dir+g.length)%g.length;
+  g[state.find.cur].forEach(m=>m.classList.add("find-current"));
+  $("find-count").textContent=(state.find.cur+1)+" / "+g.length+(g.length>=FIND_LIMIT?"+":"");
+  if(jump)g[state.find.cur][0].scrollIntoView({behavior:"smooth",block:"center",inline:"center"});
+}
+function openFindBar(){
+  $("find-bar").classList.remove("hidden"); $("find-input").focus(); $("find-input").select();
+  if($("find-input").value)runFind(false);
+}
+function closeFindBar(){ $("find-bar").classList.add("hidden"); clearFindMarks(); $("find-count").textContent=""; }
+function initFind(){
+  state.find={groups:[],cur:-1};
+  let t=0; $("find-input").addEventListener("input",()=>{clearTimeout(t);t=setTimeout(()=>runFind(true),250);});
+  $("find-input").addEventListener("keydown",e=>{
+    if(e.isComposing||e.keyCode===229)return; // IME変換中のEnterは無視
+    if(e.key==="Enter"){e.preventDefault(); if(state.find.groups.length)stepFind(e.shiftKey?-1:1); else runFind(true);}
+    else if(e.key==="Escape")closeFindBar();
+  });
+  $("find-next").addEventListener("click",()=>stepFind(1));
+  $("find-prev").addEventListener("click",()=>stepFind(-1));
+  $("find-close").addEventListener("click",closeFindBar);
+  $("find-toggle").addEventListener("click",()=>{$("find-bar").classList.contains("hidden")?openFindBar():closeFindBar();});
+  document.addEventListener("keydown",e=>{
+    const tag=e.target&&e.target.tagName;
+    if(e.key==="/"&&!e.ctrlKey&&!e.metaKey&&tag!=="INPUT"&&tag!=="TEXTAREA"&&tag!=="SELECT"&&$("modal").classList.contains("hidden")&&state.currentFile){e.preventDefault();openFindBar();}
+  });
+  $("read-toggle").addEventListener("click",toggleReadDone);
+  $("resume-btn").addEventListener("click",()=>{const f=fileById($("resume-btn").dataset.fileId);if(f)openFile(f);});
+}
+function cycleAnnotationColor(fileId,item){
+  const keys=Object.keys(MARKER_COLORS);
+  item.color=keys[(keys.indexOf(item.color||"yellow")+1)%keys.length]; item.updatedAt=new Date().toISOString();
+  markProgressChanged(); queueProgressSave();
+  $("markdown-viewer").querySelectorAll('mark[data-annotation-id="'+item.id+'"]').forEach(m=>{m.className="reader-highlight"+colorClass(item.color);});
+  renderAnnotations();
+}
+/* ---- 文字選択時のフローティングメニュー ---- */
+async function copySelectionText(){
+  const info=captureSelectionInfo(); if(!info)return showToast("コピーする文章を選択してください。");
+  try{await navigator.clipboard.writeText(info.quote);}catch(_){ try{document.execCommand("copy");}catch(__){} }
+  showToast("コピーしました。",1800);
+}
+function initSelectionMenu(){
+  const menu=$("sel-menu"), viewer=$("markdown-viewer"); let timer=0;
+  const hide=()=>menu.classList.add("hidden");
+  const update=()=>{
+    const sel=window.getSelection();
+    if(!state.currentFile||!sel||sel.isCollapsed||!sel.rangeCount){hide();return;}
+    const rg=sel.getRangeAt(0);
+    if(!viewer.contains(rg.commonAncestorContainer)){hide();return;}
+    const rect=rg.getBoundingClientRect(); if(!rect.width&&!rect.height){hide();return;}
+    menu.classList.remove("hidden");
+    const mw=menu.offsetWidth, mh=menu.offsetHeight;
+    // iOSの標準メニューが選択範囲の上に出るため、通常は下側に置く
+    let top=rect.bottom+12; if(top+mh>window.innerHeight-8)top=Math.max(8,rect.top-mh-12);
+    const left=Math.min(Math.max(8,rect.left+rect.width/2-mw/2),Math.max(8,window.innerWidth-mw-8));
+    menu.style.top=top+"px"; menu.style.left=left+"px";
+  };
+  document.addEventListener("selectionchange",()=>{clearTimeout(timer);timer=setTimeout(update,180);});
+  viewer.addEventListener("scroll",hide,{passive:true});
+  menu.addEventListener("mousedown",e=>e.preventDefault());
+  menu.addEventListener("click",e=>{
+    const b=e.target.closest("button"); if(!b)return;
+    if(b.dataset.color)addHighlight(b.dataset.color);
+    else if(b.dataset.act==="note")addNote();
+    else if(b.dataset.act==="copy")copySelectionText();
+    hide();
+  });
+}
+/* ---- 全文書の注釈：横断検索 ---- */
+function renderAllAnnotations(){
+  const q=$("all-ann-q").value.trim().toLocaleLowerCase(), type=$("all-ann-type").value, color=$("all-ann-color").value;
+  const rows=[];
+  for(const [fid,list] of Object.entries(state.progress.__annotations||{})){
+    if(!Array.isArray(list))continue;
+    const f=fileById(fid), name=f?.name||state.progress.__registrations?.[fid]?.name||"（不明な文書）";
+    for(const a of list){
+      if(!a||a.deleted)continue;
+      if(type!=="all"&&a.type!==type)continue;
+      if(color!=="all"&&(a.type!=="highlight"||(a.color||"yellow")!==color))continue;
+      if(q&&!((a.quote||"")+" "+(a.note||"")+" "+(a.label||"")+" "+name).toLocaleLowerCase().includes(q))continue;
+      rows.push({fid,a,name,f});
+    }
+  }
+  rows.sort((x,y)=>new Date(y.a.updatedAt)-new Date(x.a.updatedAt));
+  const box=$("all-ann-list"); box.innerHTML="";
+  $("all-ann-count").textContent=rows.length?`${rows.length}件${rows.length>200?"（新しい200件を表示）":""}`:"該当する注釈はありません。";
+  rows.slice(0,200).forEach(({a,name,f})=>{
+    const row=document.createElement("div"); row.className="all-ann-row";
+    const h=document.createElement("div"); h.className="text-slate-500";
+    h.textContent=name+"　"+(a.type==="highlight"?"🖍"+(MARKER_COLORS[a.color]||"黄"):a.type==="note"?"✎ メモ":"☆ "+(a.label||"しおり"));
+    row.appendChild(h);
+    if(a.quote){const d=document.createElement("div"); d.className="my-1"; d.textContent=a.quote.length>200?a.quote.slice(0,200)+"…":a.quote; row.appendChild(d);}
+    if(a.note){const d=document.createElement("div"); d.className="font-medium"; d.textContent=a.note; row.appendChild(d);}
+    const b=document.createElement("button"); b.type="button"; b.className="annotation-action"; b.textContent="この文書の該当箇所を開く";
+    b.addEventListener("click",async()=>{
+      if(!f||f.isMissing)return showToast("この文書は一覧に見つかりません。OneDriveを同期してください。");
+      $("all-ann").classList.add("hidden");
+      await openFile(f); jumpToAnnotation(a);
+    });
+    row.appendChild(b); box.appendChild(row);
+  });
+}
+function initAllAnnotations(){
+  $("all-ann-btn").addEventListener("click",()=>{$("all-ann").classList.remove("hidden");renderAllAnnotations();$("all-ann-q").focus();});
+  $("all-ann-close").addEventListener("click",()=>$("all-ann").classList.add("hidden"));
+  $("all-ann").addEventListener("click",e=>{if(e.target===$("all-ann"))$("all-ann").classList.add("hidden");});
+  let t=0; $("all-ann-q").addEventListener("input",()=>{clearTimeout(t);t=setTimeout(renderAllAnnotations,150);});
+  $("all-ann-type").addEventListener("change",renderAllAnnotations);
+  $("all-ann-color").addEventListener("change",renderAllAnnotations);
+}
 function jumpToAnnotation(item){
   if(item.type==="bookmark"&&item.position){restoreReadingPosition(item.position);syncTocCurrent();return;}
   const mark=$("markdown-viewer").querySelector('mark[data-annotation-id="'+item.id+'"]');
@@ -1752,7 +2143,7 @@ function renderAnnotations(){
   items.forEach(item=>{
     const row=document.createElement("div");row.className="border-b last:border-0 py-2";
     const head=document.createElement("div");head.className="font-semibold";
-    head.textContent=item.type==="highlight"?"🖍 ハイライト":item.type==="note"?"✎ メモ":"☆ "+(item.label||"しおり");
+    head.textContent=item.type==="highlight"?"🖍 ハイライト（"+(MARKER_COLORS[item.color]||"黄")+"）":item.type==="note"?"✎ メモ":"☆ "+(item.label||"しおり");
     if(state.orphanIds.has(item.id)){const o=document.createElement("span");o.className="orphan-label";o.textContent="位置不明";o.title="本文が変更されたため、元の位置が見つかりません";head.appendChild(o);}
     row.appendChild(head);
     if(item.quote){const quote=document.createElement("div");quote.className="text-slate-500 my-1";quote.textContent=item.quote;row.appendChild(quote);}
@@ -1761,6 +2152,10 @@ function renderAnnotations(){
     if(!state.orphanIds.has(item.id)){
       const jump=document.createElement("button");jump.type="button";jump.className="annotation-action";jump.textContent="この位置へ移動";
       jump.addEventListener("click",()=>jumpToAnnotation(item));actions.appendChild(jump);
+    }
+    if(item.type==="highlight"){
+      const col=document.createElement("button");col.type="button";col.className="annotation-action";col.textContent="色を変える";
+      col.addEventListener("click",()=>cycleAnnotationColor(fileId,item));actions.appendChild(col);
     }
     const del=document.createElement("button");del.type="button";del.className="annotation-action";del.textContent="削除";
     del.addEventListener("click",()=>deleteAnnotation(fileId,item.id));actions.appendChild(del);
@@ -1970,7 +2365,16 @@ function initTocResizer() {
   handle.addEventListener("keydown",e=>{ const current=getSavedTocWidth(); if(e.key==="ArrowLeft"||e.key==="ArrowRight"){e.preventDefault();applyTocWidth(current+(e.key==="ArrowRight"?20:-20));}});
 }
 $("toc-toggle").addEventListener("click",()=>keepTopAnchor(()=>setTocVisible($("toc-panel").classList.contains("hidden"))));
-["font-size-select","line-height-select","content-width-select"].forEach(id=>$(id).addEventListener("change",saveReaderSettings));
+$("page-prev-btn").addEventListener("click",()=>pageScroll(-1));
+$("page-next-btn").addEventListener("click",()=>pageScroll(1));
+document.addEventListener("keydown",handlePagingKey);
+document.addEventListener("keydown",e=>{if(e.key==="Escape")$("all-ann").classList.add("hidden");});
+$("markdown-viewer").addEventListener("click",handleTapPaging);
+$("markdown-viewer").addEventListener("wheel",e=>{ // 縦書きでは縦ホイールを横スクロールに変換
+  if(!isVertical()||Math.abs(e.deltaY)<=Math.abs(e.deltaX))return;
+  e.preventDefault(); $("markdown-viewer").scrollLeft-=e.deltaY;
+},{passive:false});
+["font-size-select","line-height-select","content-width-select","font-family-select","paper-select","writing-select","tap-paging-select"].forEach(id=>$(id).addEventListener("change",saveReaderSettings));
 $("focus-toggle").addEventListener("click",()=>keepTopAnchor(()=>{state.focusMode=!state.focusMode;$("markdown-viewer").classList.toggle("focus-mode",state.focusMode);if(state.focusMode){setTocVisible(false);}$("focus-toggle").textContent=state.focusMode?"通常表示":"集中モード";}));
 
 /* 文字選択を保つ：PCはmousedownの既定動作を止め、iOSは選択変更のたびに直前の選択を保持する */
@@ -1981,7 +2385,15 @@ document.addEventListener("selectionchange", () => {
   const r = sel.getRangeAt(0);
   if ($("markdown-viewer").contains(r.commonAncestorContainer)) state.lastSel = { range: r.cloneRange(), time: Date.now() };
 });
-$("highlight-btn").addEventListener("click",addHighlight);
+$("highlight-btn").addEventListener("click",()=>addHighlight());
+$("marker-color-select").value=(()=>{try{return localStorage.getItem("md_marker_color")||"yellow";}catch(_){return "yellow";}})()||"yellow";
+$("marker-color-select").addEventListener("change",()=>{try{localStorage.setItem("md_marker_color",$("marker-color-select").value);}catch(_){}});
+initSelectionMenu(); initAllAnnotations(); initFind();
+$("offline-save-btn").addEventListener("click", saveRegisteredOffline);
+window.addEventListener("online", goOnline);
+window.addEventListener("offline", () => { setOfflineUI(); showToast("オフラインになりました。保存済みの文書は読めます。", 3000); });
+setOfflineUI();
+if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register("sw.js").catch(() => {}); // sw.jsが無い配置でも動く
 $("note-btn").addEventListener("click",addNote);
 $("bookmark-btn").addEventListener("click",addBookmark);
 $("annotations-toggle").addEventListener("click",()=>{const p=$("annotations-panel");p.classList.toggle("hidden");if(!p.classList.contains("hidden"))renderAnnotations();});
