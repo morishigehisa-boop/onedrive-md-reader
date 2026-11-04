@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OneDrive Markdown Reader v3.6</title>
+<title>OneDrive Markdown Reader v3.7</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js" integrity="sha384-JEyTNhjM6R1ElGoJns4U2Ln4ofPcqzSsynQkmEc/KGy6336qAZl70tDLufbkla+3" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js" integrity="sha384-B5PXeUfgiegchZiX5iMRssMrHd9NfPhFnITob1HyW1CY76udptWpBsniaDsH/+BY" crossorigin="anonymous"></script>
 <style>
   body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
   #markdown-viewer { font-size:.96rem; line-height:1.85; color:#334155; overflow-wrap:anywhere; }
@@ -27,6 +27,7 @@
   #markdown-viewer th,#markdown-viewer td {border:1px solid #cbd5e1;padding:.5em .7em;text-align:left;min-width:100px}
   #markdown-viewer th {background:#f1f5f9}
   #markdown-viewer img {max-width:100%;height:auto}
+  #markdown-viewer img.img-error {display:inline-block;padding:.3em .6em;border:1px dashed #cbd5e1;border-radius:4px;color:#94a3b8;font-size:.8em}
   #markdown-viewer a {color:#2563eb;text-decoration:underline}
   #markdown-viewer hr {border:0;border-top:1px solid #e2e8f0;margin:2em 0}
   .file-row.active {background:#eff6ff;border-color:#93c5fd}
@@ -45,7 +46,7 @@
   body[data-theme="dark"] .file-row.active {background:#1e3a5f;border-color:#3b82f6}
   body[data-theme="dark"] .file-row:hover {background:#1e293b}
   body[data-theme="dark"] .group-heading {background:#263449;color:#e2e8f0}
-  body[data-theme="dark"] input, body[data-theme="dark"] select {background:#1e293b;color:#e2e8f0;border-color:#475569}
+  body[data-theme="dark"] input, body[data-theme="dark"] select, body[data-theme="dark"] textarea {background:#1e293b;color:#e2e8f0;border-color:#475569}
   body[data-theme="dark"] button {border-color:#475569}
   body[data-theme="dark"] .text-slate-700 {color:#e2e8f0}
   body[data-theme="dark"] .text-slate-500, body[data-theme="dark"] .text-slate-400 {color:#94a3b8}
@@ -53,7 +54,7 @@
   #reader-toolbar {display:flex;flex-wrap:wrap;gap:.45rem;align-items:center;margin-bottom:.65rem;padding:.55rem;border:1px solid #e2e8f0;border-radius:.6rem;background:#f8fafc}
   #reader-toolbar button,#reader-toolbar select {font-size:.75rem;border:1px solid #cbd5e1;border-radius:.4rem;padding:.35rem .55rem;background:white;color:#334155}
   #reader-layout {display:flex;gap:.8rem;min-height:0;flex:1}
-  #toc-panel {width:var(--toc-width,220px);flex:0 0 var(--toc-width,220px);min-width:140px;max-width:420px;overflow:auto;border-right:1px solid #e2e8f0;padding-right:.6rem;font-size:.78rem}
+  #toc-panel {position:relative;width:var(--toc-width,220px);flex:0 0 var(--toc-width,220px);min-width:140px;max-width:420px;overflow:auto;border-right:1px solid #e2e8f0;padding-right:.6rem;font-size:.78rem}
   #toc-resizer {width:8px;flex:0 0 8px;cursor:col-resize;position:relative;touch-action:none;user-select:none;display:none}
   #toc-resizer::after {content:"";position:absolute;top:0;bottom:0;left:3px;width:2px;background:#cbd5e1;border-radius:2px}
   #toc-resizer:hover::after,#toc-resizer.dragging::after {background:#3b82f6;width:3px;left:2.5px}
@@ -63,24 +64,33 @@
   body[data-theme="dark"] #toc-resizer:hover::after,body[data-theme="dark"] #toc-resizer.dragging::after {background:#60a5fa}
   #toc-panel button {display:block;text-align:left;width:100%;padding:.28rem .4rem;border-radius:.3rem;color:#475569}
   #toc-panel button:hover {background:#e2e8f0}
+  #toc-panel button.toc-active {background:#dbeafe;color:#1d4ed8;font-weight:700}
   #reader-main {display:flex;flex-direction:column;min-width:0;flex:1;min-height:0}
   #reading-progress-track {height:4px;background:#e2e8f0;border-radius:9px;overflow:hidden;margin-bottom:.55rem}
   #reading-progress-fill {height:100%;width:0;background:#2563eb;transition:width .12s}
   #markdown-viewer.focus-mode {max-width:900px;margin:auto;width:100%;padding-left:1rem;padding-right:1rem}
   #markdown-viewer mark.reader-highlight {background:#fde68a;color:#422006;border-radius:2px;padding:0 .05em}
+  #markdown-viewer mark.reader-note {background:transparent;color:inherit;border-bottom:2px dotted #f59e0b}
   body[data-theme="dark"] #reader-toolbar {background:#172337;border-color:#334155}
   body[data-theme="dark"] #reader-toolbar button,body[data-theme="dark"] #reader-toolbar select {background:#1e293b;color:#e2e8f0;border-color:#475569}
   body[data-theme="dark"] #toc-panel {border-color:#334155}
   body[data-theme="dark"] #toc-panel button {color:#cbd5e1}
   body[data-theme="dark"] #toc-panel button:hover {background:#334155}
+  body[data-theme="dark"] #toc-panel button.toc-active {background:#1e3a5f;color:#93c5fd}
   body[data-theme="dark"] #reading-progress-track {background:#334155}
   body[data-theme="dark"] #markdown-viewer mark.reader-highlight {background:#854d0e;color:#fef3c7}
+  body[data-theme="dark"] #markdown-viewer mark.reader-note {background:transparent;color:inherit}
   body[data-theme="dark"] #markdown-viewer blockquote {background:#1e293b}
+  body[data-theme="dark"] #markdown-viewer img.img-error {border-color:#475569}
   @media(max-width:760px){#reader-layout{gap:.4rem}}
   @media(max-width:520px){#toc-panel{display:none}#toc-resizer{display:none !important}}
-  /* ファイル一覧ペインを隠したときは閲覧領域を最大化 */
+  /* iOS Safari：16px未満の入力欄はフォーカス時に画面が勝手に拡大されるため */
+  @media(max-width:760px){input,select,textarea{font-size:16px !important}}
+  /* タッチ端末はボタンを押しやすく */
+  @media(pointer:coarse){#reader-toolbar button,#reader-toolbar select{padding:.55rem .75rem;min-height:40px}}
+  /* ファイル一覧ペインを隠したときは閲覧領域を最大化（dvh非対応ブラウザ向けにvhを先に書く） */
   #app-main.library-hidden > #library-pane { display:none !important; }
-  #app-main.library-hidden > #viewer-panel { width:100%; height:calc(100vh - 6.5rem) !important; }
+  #app-main.library-hidden > #viewer-panel { width:100%; height:calc(100vh - 6.5rem) !important; height:calc(100dvh - 6.5rem) !important; }
   #library-pane { transition: opacity .15s ease; }
   #library-pane-toggle { white-space:nowrap; }
   #tag-editor {min-width:150px;max-width:260px}
@@ -89,6 +99,10 @@
   body[data-theme="dark"] .tag-chip {background:#263449;color:#e2e8f0;border-color:#475569}
   .annotation-action {font-size:.7rem;color:#2563eb;text-decoration:underline;margin-right:.6rem}
   body[data-theme="dark"] .annotation-action {color:#93c5fd}
+  .orphan-label {display:inline-block;margin-left:.4rem;padding:0 .4rem;border-radius:999px;background:#fee2e2;color:#b91c1c;font-size:.65rem;font-weight:600}
+  body[data-theme="dark"] .orphan-label {background:#7f1d1d;color:#fecaca}
+  #modal-box {background:#fff;color:#1e293b}
+  body[data-theme="dark"] #modal-box {background:#111c2e;color:#e2e8f0}
   .spinner {width:15px;height:15px;border:2px solid #cbd5e1;border-top-color:#2563eb;border-radius:50%;display:inline-block;animation:spin .8s linear infinite}
   @keyframes spin {to{transform:rotate(360deg)}}
 </style>
@@ -97,7 +111,7 @@
 <header class="bg-white border-b border-slate-200 px-4 py-3 flex flex-wrap gap-3 justify-between items-center shadow-sm">
   <div class="flex items-center gap-2">
     <h1 class="text-lg font-bold text-slate-800">📖 OneDrive Markdown Reader</h1>
-    <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded-full">v3.6</span>
+    <span class="bg-slate-800 text-white text-xs px-2 py-1 rounded-full">v3.7</span>
   </div>
   <div class="flex items-center gap-3">
     <span id="account-label" class="text-xs text-slate-500"></span>
@@ -108,10 +122,10 @@
 </header>
 
 <main id="app-main" class="flex-1 w-full p-3 md:p-5 flex flex-col md:flex-row gap-4 min-h-0">
-  <aside id="library-pane" class="w-full md:w-96 md:flex-shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[42vh] md:h-[calc(100vh-6.5rem)]">
+  <aside id="library-pane" class="w-full md:w-96 md:flex-shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col h-[42dvh] md:h-[calc(100dvh-6.5rem)]">
     <div class="flex justify-between items-center mb-3">
       <h2 id="list-title" class="text-sm font-bold text-slate-700">登録済み Markdown</h2>
-      <button id="sync-btn" class="text-xs text-blue-700 hover:underline disabled:text-slate-400" disabled>同期</button>
+      <button id="sync-btn" class="text-xs text-blue-700 hover:underline disabled:text-slate-400" disabled>一覧を同期</button>
     </div>
     <div class="flex gap-2 mb-2">
       <button id="show-registered-btn" class="flex-1 rounded-lg border px-2 py-2 text-xs bg-blue-50 border-blue-200 text-blue-700" disabled>登録済み</button>
@@ -141,7 +155,7 @@
     <button id="more-btn" class="hidden mt-2 w-full border rounded-lg py-2 text-xs hover:bg-slate-50">さらに表示</button>
   </aside>
 
-  <section id="viewer-panel" class="flex-1 min-w-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 flex flex-col h-[55vh] md:h-[calc(100vh-6.5rem)]">
+  <section id="viewer-panel" class="flex-1 min-w-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 flex flex-col h-[55dvh] md:h-[calc(100dvh-6.5rem)]">
     <div id="viewer-header" class="hidden border-b pb-3 mb-3 flex justify-between gap-3 items-center">
       <div class="min-w-0">
         <div id="current-file-name" class="font-bold text-slate-800 truncate"></div>
@@ -179,6 +193,18 @@
   </section>
 </main>
 
+<div id="modal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div id="modal-box" class="w-full max-w-md rounded-xl shadow-xl p-4">
+    <div id="modal-title" class="font-bold mb-2"></div>
+    <div id="modal-quote" class="hidden text-xs text-slate-500 mb-2 max-h-20 overflow-auto border-l-4 border-slate-300 pl-2"></div>
+    <textarea id="modal-input" rows="4" class="w-full border border-slate-300 rounded-lg p-2 text-base"></textarea>
+    <div class="flex justify-end gap-2 mt-3">
+      <button id="modal-cancel" type="button" class="border border-slate-300 rounded-lg px-4 py-2 text-sm">キャンセル</button>
+      <button id="modal-ok" type="button" class="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm">保存</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 hidden max-w-[90vw] bg-slate-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg z-50"></div>
 
 <script>
@@ -195,17 +221,22 @@ const CONFIG = {
   SCOPES: ["User.Read", "Files.ReadWrite"],
   GRAPH: "https://graph.microsoft.com/v1.0",
   DB_NAME: "OneDriveMarkdownReader",
-  DB_VERSION: 1,
+  DB_VERSION: 2,                    // v2: 全文検索キャッシュ用ストア"fulltext"を追加
   PROGRESS_FILE: "reading-progress.json",
   PAGE_SIZE: 200,
   RENDER_BATCH: 200,
   SAVE_DELAY: 700,
   PERIODIC_SAVE_INTERVAL: 10000,
-  REMOTE_POLL_INTERVAL: 5000,
-  REMOTE_APPLY_IDLE_MS: 3000
+  REMOTE_POLL_INTERVAL: 20000,      // eTag確認のみで差分がなければ本文を取得しないため20秒で十分
+  REMOTE_APPLY_IDLE_MS: 3000,
+  TOMBSTONE_TTL_DAYS: 90,           // 削除済み注釈の墓標を残す期間
+  SEARCH_CONCURRENCY: 4,
+  IMAGE_CONCURRENCY: 4,
+  IMAGE_WAIT_MS: 2500
 };
 
 const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 const state = {
   msal: null,
   account: null,
@@ -215,10 +246,11 @@ const state = {
   filtered: [],
   listMode: "registered",
   rendered: 0,
+  listSignature: "",
   currentFile: null,
   openRequest: 0,
   openController: null,
-  scrollTimer: null,
+  viewerReady: false,
   saveTimer: null,
   saveChain: Promise.resolve(),
   progress: {},
@@ -233,6 +265,8 @@ const state = {
   progressBusy: false,
   localRevision: 0,
   lastRemoteProgress: null,
+  remoteETag: null,
+  progressFileSeen: false,
   pollInFlight: false,
   pendingLocalFileIds: new Set(),
   progressDirty: false,
@@ -243,8 +277,19 @@ const state = {
   readingQueue: [],
   fileTags: {},
   fullTextCache: new Map(),
+  searchToken: 0,
   focusMode: false,
-  libraryHidden: false
+  libraryHidden: false,
+  blocks: [],
+  blocksByFp: new Map(),
+  lastSel: null,
+  orphanIds: new Set(),
+  blobUrls: [],
+  headings: [],
+  tocButtons: [],
+  tocObserver: null,
+  tocCurrent: -1,
+  lastSaveErrorToastAt: 0
 };
 
 function showToast(message, ms = 4500) {
@@ -260,10 +305,79 @@ function errorMessage(err) {
   if (!err) return "原因不明のエラー";
   return err.message || String(err);
 }
-function safeText(value) { return String(value ?? ""); }
+function fmtDateTime(date) {
+  return date.toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+/* Graph APIのエラー。statusで原因を判定できるようにする */
+class GraphError extends Error {
+  constructor(status, message, extra) {
+    super(message);
+    this.name = "GraphError";
+    this.status = status;
+    if (extra) Object.assign(this, extra);
+  }
+}
+/* 画面に出すエラー文を原因別に分ける */
+function describeError(err) {
+  if (err instanceof GraphError) {
+    if (err.status === 401 || err.status === 403) return "認証の期限切れ、または権限不足です。ログインし直してください。";
+    if (err.status === 409 || err.status === 412) return "他の端末の更新と重なりました。自動で再試行します。";
+    if (err.status === 429 || err.status >= 500) return "OneDriveが混み合っています。時間をおいて自動で再試行します。";
+    return errorMessage(err);
+  }
+  if (err && err.code === "BAD_JSON") return errorMessage(err);
+  if (err instanceof TypeError || (typeof navigator !== "undefined" && navigator.onLine === false)) {
+    return "ネットワークに接続できません。通信状況を確認してください。";
+  }
+  return errorMessage(err);
+}
 
 /* =========================
-   IndexedDB：ファイル一覧キャッシュ
+   入力ダイアログ（iOSでも使いやすい独自モーダル）
+   ========================= */
+function showTextModal({ title, quote = "", value = "", placeholder = "", multiline = false, okLabel = "保存" }) {
+  return new Promise(resolve => {
+    const modal = $("modal"), input = $("modal-input"), ok = $("modal-ok"), cancel = $("modal-cancel");
+    $("modal-title").textContent = title;
+    const q = $("modal-quote");
+    q.textContent = quote;
+    q.classList.toggle("hidden", !quote);
+    input.value = value;
+    input.placeholder = placeholder;
+    input.rows = multiline ? 4 : 1;
+    ok.textContent = okLabel;
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+
+    function close(result) {
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+      ok.removeEventListener("click", onOk);
+      cancel.removeEventListener("click", onCancel);
+      input.removeEventListener("keydown", onKey);
+      modal.removeEventListener("click", onBackdrop);
+      resolve(result);
+    }
+    function onOk() { close(input.value); }
+    function onCancel() { close(null); }
+    function onKey(e) {
+      if (e.isComposing || e.keyCode === 229) return; // 日本語変換中のEnterは確定として扱う
+      if (e.key === "Escape") { e.preventDefault(); onCancel(); }
+      else if (e.key === "Enter" && (!multiline || e.metaKey || e.ctrlKey)) { e.preventDefault(); onOk(); }
+    }
+    function onBackdrop(e) { if (e.target === modal) onCancel(); }
+    ok.addEventListener("click", onOk);
+    cancel.addEventListener("click", onCancel);
+    input.addEventListener("keydown", onKey);
+    modal.addEventListener("click", onBackdrop);
+    input.focus(); // iOSでキーボードを出すため、タップ操作と同じ流れで同期的にフォーカスする
+    input.select();
+  });
+}
+
+/* =========================
+   IndexedDB：ファイル一覧・全文検索キャッシュ
    ========================= */
 function openDatabase() {
   return new Promise((resolve, reject) => {
@@ -272,6 +386,7 @@ function openDatabase() {
       const db = req.result;
       if (!db.objectStoreNames.contains("items")) db.createObjectStore("items", { keyPath: "id" });
       if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "key" });
+      if (!db.objectStoreNames.contains("fulltext")) db.createObjectStore("fulltext", { keyPath: "id" });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -435,7 +550,7 @@ async function graphRequest(url, options = {}, retryAuth = true) {
 
   if (response.status === 429 || response.status === 503 || response.status === 504) {
     const retryAfter = Number(response.headers.get("Retry-After") || 3);
-    throw new Error(`Microsoft Graphが一時的に混雑しています（${response.status}）。${retryAfter}秒後に再試行してください。`);
+    throw new GraphError(response.status, `Microsoft Graphが一時的に混雑しています（${response.status}）。${retryAfter}秒後に再試行してください。`, { retryAfter });
   }
 
   if (!response.ok) {
@@ -444,7 +559,7 @@ async function graphRequest(url, options = {}, retryAuth = true) {
       const body = await response.json();
       detail = body.error?.message || body.error?.code || "";
     } catch (_) {}
-    throw new Error(`Graph APIエラー ${response.status}${detail ? "：" + detail : ""}`);
+    throw new GraphError(response.status, `Graph APIエラー ${response.status}${detail ? "：" + detail : ""}`);
   }
   return response;
 }
@@ -497,7 +612,7 @@ async function syncDrive() {
         });
       } catch (err) {
         // 古いdelta tokenが無効な場合は初回同期に戻す
-        if (deltaLink && /Graph APIエラー (400|410|404)/.test(errorMessage(err))) {
+        if (deltaLink && err instanceof GraphError && [400, 404, 410].includes(err.status)) {
           await idbSetMeta("deltaLink", null);
           deltaLink = null;
           nextUrl = "/me/drive/root/delta?$top=" + CONFIG.PAGE_SIZE;
@@ -524,13 +639,13 @@ async function syncDrive() {
     await loadFileIndex();
     const now = new Date();
     await idbSetMeta("lastSync", now.toISOString());
-    $("sync-time").textContent = now.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+    $("sync-time").textContent = fmtDateTime(now);
     setListStatus(`同期完了（変更 ${changed.length} 件 / 削除 ${deleted.length} 件）`);
     showToast("OneDriveのファイル一覧を同期しました。");
   } catch (err) {
     console.error(err);
-    setListStatus("同期エラー：" + errorMessage(err));
-    showToast("ファイル同期に失敗しました：" + errorMessage(err), 7000);
+    setListStatus("同期エラー：" + describeError(err));
+    showToast("ファイル同期に失敗しました：" + describeError(err), 7000);
     // キャッシュがあれば表示を維持する
     await loadFileIndex().catch(console.error);
   } finally {
@@ -548,16 +663,28 @@ async function loadFileIndex() {
   const byId = new Map(all.map(x => [x.id, x]));
   const files = all.filter(x => x.isFile && /\.md$/i.test(x.name));
 
-  function getPath(item) {
-    const parts = [item.name];
-    let parentId = item.parentId;
-    let safety = 0;
-    while (parentId && byId.has(parentId) && safety++ < 100) {
-      const parent = byId.get(parentId);
-      if (parent.isFolder && parent.name) parts.unshift(parent.name);
-      parentId = parent.parentId;
+  // フォルダのパスをメモ化し、ファイル数が多くても親をたどり直さない
+  const folderPathMemo = new Map();
+  function folderPath(id) {
+    if (!id || !byId.has(id)) return "";
+    if (folderPathMemo.has(id)) return folderPathMemo.get(id);
+    const chain = [];
+    let cur = id, guard = 0;
+    while (cur && byId.has(cur) && !folderPathMemo.has(cur) && guard++ < 200) {
+      chain.push(cur);
+      cur = byId.get(cur).parentId;
     }
-    return parts.join("/");
+    let base = (cur && folderPathMemo.has(cur)) ? folderPathMemo.get(cur) : "";
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const f = byId.get(chain[i]);
+      if (f.isFolder && f.name) base = base ? base + "/" + f.name : f.name;
+      folderPathMemo.set(chain[i], base);
+    }
+    return folderPathMemo.get(id) ?? "";
+  }
+  function getPath(item) {
+    const dir = folderPath(item.parentId);
+    return dir ? dir + "/" + item.name : item.name;
   }
 
   state.files = files.map(item => ({ ...item, path: getPath(item) }))
@@ -583,14 +710,19 @@ function renderGroupSelect() {
 function persistLocalProgress() {
   try { localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress)); } catch (_) {}
 }
+function markProgressChanged() {
+  state.localRevision++;
+  state.progressDirty = true;
+  persistLocalProgress();
+}
 async function createGroup() {
-  const name = prompt("新しいグループ名を入力してください（例：投資、節税）");
+  const name = await showTextModal({ title: "新しいグループ名", placeholder: "例：投資、節税", okLabel: "作成" });
   if (!name || !name.trim()) return;
   const clean = name.trim();
   if (state.groups.some(g=>!g.deleted && g.name.toLocaleLowerCase()===clean.toLocaleLowerCase())) { showToast("同じ名前のグループがあります。"); return; }
   state.groups.push({id:"g_"+crypto.randomUUID(), name:clean, updatedAt:new Date().toISOString()});
   state.progress.__groups = state.groups;
-  state.localRevision++; state.progressDirty = true; persistLocalProgress();
+  markProgressChanged();
   renderGroupSelect(); $("group-select").value = state.groups[state.groups.length-1].id;
   applyFilter(); await queueProgressSave();
 }
@@ -598,12 +730,12 @@ async function renameGroup() {
   const id = $("group-select").value;
   const group = state.groups.find(g=>g.id===id);
   if (!group) { showToast("名前を変更するグループを選択してください。"); return; }
-  const name = prompt("新しいグループ名", group.name);
+  const name = await showTextModal({ title: "グループ名の変更", value: group.name });
   if (!name || !name.trim()) return;
   const clean=name.trim();
   if (state.groups.some(g=>g.id!==id && !g.deleted && g.name.toLocaleLowerCase()===clean.toLocaleLowerCase())) { showToast("同じ名前のグループがあります。"); return; }
   group.name=clean; group.updatedAt=new Date().toISOString(); state.progress.__groups=state.groups;
-  state.localRevision++; state.progressDirty=true; persistLocalProgress(); renderGroupSelect(); $("group-select").value=id; applyFilter(); await queueProgressSave();
+  markProgressChanged(); renderGroupSelect(); $("group-select").value=id; applyFilter(); await queueProgressSave();
 }
 async function deleteGroup() {
   const id=$("group-select").value;
@@ -614,27 +746,52 @@ async function deleteGroup() {
   const deletedAt=new Date().toISOString();
   state.groups=state.groups.map(g=>g.id===id?{...g,deleted:true,updatedAt:deletedAt}:g);
   for (const r of Object.values(state.progress.__registrations||{})) if (r.groupId===id) { r.groupId="__ungrouped"; r.updatedAt=deletedAt; }
-  state.progress.__groups=state.groups; state.localRevision++; state.progressDirty=true; persistLocalProgress();
+  state.progress.__groups=state.groups; markProgressChanged();
   renderGroupSelect(); $("group-select").value="all"; applyFilter(); await queueProgressSave();
 }
 
-function applyFilter() {
+/* 一覧の表示内容に影響する情報だけを文字列化。変化がなければ再描画しない */
+function listSignature() {
+  const regs = state.progress.__registrations || {};
+  const tags = state.progress.__fileTags || {};
+  return JSON.stringify([
+    Object.entries(regs).filter(([, r]) => r && r.enabled).map(([id, r]) => [id, r.groupId || "", r.name || "", r.path || ""]).sort(),
+    (state.progress.__groups || []).map(g => [g.id, g.name, !!g.deleted]).sort(),
+    Object.entries(tags).map(([id, t]) => [id, (t.tags || []).join(",")]).sort()
+  ]);
+}
+/* 同期後の一覧更新：変化があるときだけ再描画し、スクロール位置を保つ */
+function syncListView() {
+  refreshRegisteredFiles();
+  const sig = listSignature();
+  if (sig !== state.listSignature) {
+    renderGroupSelect();
+    applyFilter(true);
+  }
+}
+function applyFilter(keepScroll = false) {
+  const list = $("file-list");
+  const prevTop = keepScroll ? list.scrollTop : 0;
+  const prevRendered = keepScroll ? state.rendered : 0;
   const q = $("filter-input").value.trim().toLocaleLowerCase();
   const source = state.listMode === "search" ? state.files : state.registeredFiles;
   const selectedGroup = $("group-select").value || "all";
+  const tagQuery = ($("tag-filter-input")?.value || "").trim().toLocaleLowerCase();
   state.filtered = source.filter(f => {
     const textMatch = !q || f.name.toLocaleLowerCase().includes(q) || f.path.toLocaleLowerCase().includes(q);
     const groupId = state.progress.__registrations?.[f.id]?.groupId || "__ungrouped";
     const groupMatch = state.listMode === "search" || selectedGroup === "all" || groupId === selectedGroup;
-    const tagQuery = ($("tag-filter-input")?.value || "").trim().toLocaleLowerCase();
     const tags = state.progress.__fileTags?.[f.id]?.tags || [];
     const tagMatch = !tagQuery || tags.some(t => String(t).toLocaleLowerCase().includes(tagQuery));
     return textMatch && groupMatch && tagMatch;
   });
+  state.listSignature = listSignature();
   state.rendered = 0;
   $("file-count").textContent = `${state.filtered.length.toLocaleString("ja-JP")} 件`;
-  $("file-list").innerHTML = "";
+  list.innerHTML = "";
   renderMoreFiles();
+  while (state.rendered < Math.min(prevRendered, state.filtered.length)) renderMoreFiles();
+  if (keepScroll) list.scrollTop = prevTop;
 }
 function setListMode(mode) {
   state.listMode = mode;
@@ -655,11 +812,9 @@ async function saveRegistration(file, enabled) {
   const chosenGroup = $("group-select").value;
   const groupId = enabled ? (chosenGroup && chosenGroup !== "all" ? chosenGroup : "__ungrouped") : (existing.groupId || "__ungrouped");
   state.progress.__registrations[file.id] = { ...existing, enabled, groupId, name: file.name, path: file.path, updatedAt: now };
-  state.localRevision++;
-  state.progressDirty = true;
-  localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress));
+  markProgressChanged();
   refreshRegisteredFiles();
-  applyFilter();
+  applyFilter(true);
   await queueProgressSave();
 }
 function refreshRegisteredFiles() {
@@ -701,6 +856,13 @@ function renderMoreFiles() {
     path.className = "text-[10px] text-slate-400 break-all mt-1";
     path.textContent = file.path;
     open.append(name, path);
+    const tags = state.progress.__fileTags?.[file.id]?.tags || [];
+    if (tags.length) {
+      const tagWrap = document.createElement("div");
+      tagWrap.className = "mt-1";
+      tags.forEach(t => { const chip = document.createElement("span"); chip.className = "tag-chip"; chip.textContent = t; tagWrap.appendChild(chip); });
+      open.appendChild(tagWrap);
+    }
     open.addEventListener("click", () => { if (!file.isMissing) openFile(file); });
     row.appendChild(open);
     const action = document.createElement("button");
@@ -719,8 +881,8 @@ function renderMoreFiles() {
       move.title="所属グループを変更";
       move.addEventListener("change", async()=>{
         const reg=state.progress.__registrations[file.id]; if(!reg)return;
-        reg.groupId=move.value; reg.updatedAt=new Date().toISOString(); state.localRevision++; state.progressDirty=true; persistLocalProgress();
-        refreshRegisteredFiles(); applyFilter(); await queueProgressSave();
+        reg.groupId=move.value; reg.updatedAt=new Date().toISOString(); markProgressChanged();
+        refreshRegisteredFiles(); applyFilter(true); await queueProgressSave();
       });
       row.appendChild(move);
     }
@@ -742,70 +904,178 @@ async function downloadDriveItem(fileId, signal) {
   // /content はGraphの認証付きエンドポイント。302リダイレクト先をfetchが追跡するため、downloadUrl属性に依存しない。
   return graphRequest(`/me/drive/items/${encodeURIComponent(fileId)}/content`, { signal });
 }
+
+/* 全文検索キャッシュ（メモリ＋IndexedDB）。cTag（本文が変わると変わる）で更新を判定 */
+function fileVersion(file) { return file.cTag || file.eTag || file.modified || ""; }
+function cacheFullText(file, text) {
+  const ver = fileVersion(file);
+  if (!ver || file.isMissing) return;
+  state.fullTextCache.set(file.id, { ver, text });
+  idbPutMany("fulltext", [{ id: file.id, ver, text }]).catch(() => {});
+}
+async function getFullText(file) {
+  const ver = fileVersion(file);
+  const mem = state.fullTextCache.get(file.id);
+  if (ver && mem && mem.ver === ver) return mem.text;
+  if (ver) {
+    try {
+      const rec = await idbGet("fulltext", file.id);
+      if (rec && rec.ver === ver) { state.fullTextCache.set(file.id, { ver, text: rec.text }); return rec.text; }
+    } catch (_) {}
+  }
+  const response = await downloadDriveItem(file.id);
+  const text = await response.text();
+  cacheFullText(file, text);
+  return text;
+}
+
+/* ---- 相対パス画像（./img/a.png など）をOneDriveから取得して表示 ---- */
+const ABSOLUTE_URL = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
+/* 相対パス画像のsrcを退避する。<template>内は読み込みが始まらないため、無駄な404リクエストが出ない */
+function detachRelativeImages(root) {
+  const list = [];
+  root.querySelectorAll("img").forEach(img => {
+    const src = img.getAttribute("src") || "";
+    if (!src || src.startsWith("#") || ABSOLUTE_URL.test(src)) return;
+    img.dataset.relSrc = src;
+    img.removeAttribute("src");
+    list.push(img);
+  });
+  return list;
+}
+async function fetchRelativeAsset(file, src, signal) {
+  const clean = src.split("#")[0].split("?")[0];
+  let decoded;
+  try { decoded = decodeURIComponent(clean); } catch (_) { decoded = clean; }
+  const segs = decoded.split("/");
+  let base = null;
+  const rest = [];
+  if (decoded.startsWith("/")) {
+    segs.forEach(s => { if (s && s !== "." && s !== "..") rest.push(s); });
+  } else {
+    base = file.parentId || null;
+    for (const s of segs) {
+      if (s === "" || s === ".") continue;
+      if (s === "..") {
+        if (rest.length) rest.pop();
+        else if (base) { const parent = await idbGet("items", base); base = parent?.parentId || null; }
+      } else rest.push(s);
+    }
+  }
+  if (!rest.length) throw new Error("画像のパスが不正です。");
+  const encoded = rest.map(encodeURIComponent).join("/");
+  const url = base
+    ? `/me/drive/items/${encodeURIComponent(base)}:/${encoded}:/content`
+    : `/me/drive/root:/${encoded}:/content`;
+  return graphRequest(url, { signal });
+}
+async function loadRelativeImages(file, imgs, signal, requestId) {
+  const cache = new Map();
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < imgs.length) {
+      const img = imgs[cursor++];
+      if (requestId !== state.openRequest) return;
+      const src = img.dataset.relSrc;
+      try {
+        let url = cache.get(src);
+        if (!url) {
+          const response = await fetchRelativeAsset(file, src, signal);
+          url = URL.createObjectURL(await response.blob());
+          cache.set(src, url);
+          state.blobUrls.push(url);
+        }
+        if (requestId === state.openRequest) img.src = url;
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        img.alt = `（画像を読み込めません：${src}）`;
+        img.classList.add("img-error");
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONFIG.IMAGE_CONCURRENCY, imgs.length) }, worker));
+}
+function revokeBlobUrls() {
+  state.blobUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch (_) {} });
+  state.blobUrls = [];
+}
+
 async function openFile(file) {
   if (state.currentFile && state.currentFile.id !== file.id) await flushProgress();
   const requestId = ++state.openRequest;
   if (state.openController) state.openController.abort();
   state.openController = new AbortController();
+  const signal = state.openController.signal;
 
   state.currentFile = file;
+  state.viewerReady = false;
   state.lastLocalInteractionAt = 0;
   state.lastLocalSavedAt = 0;
-  document.querySelectorAll(".file-row").forEach(el => el.classList.remove("active"));
-  // 現在の項目を見た目上選択
-  const selected = [...document.querySelectorAll(".file-row")].find(el => el.firstChild?.textContent === file.name);
-  if (selected) selected.classList.add("active");
+  state.lastSel = null;
+  state.orphanIds.clear();
+  if (state.tocObserver) { state.tocObserver.disconnect(); state.tocObserver = null; }
+  revokeBlobUrls();
+  document.querySelectorAll(".file-row").forEach(el => el.classList.toggle("active", el.dataset.fileId === file.id));
 
   $("viewer-header").classList.remove("hidden");
   $("current-file-name").textContent = file.name;
   $("current-file-path").textContent = file.path;
-  $("markdown-viewer").innerHTML = '<div class="text-center py-12 text-slate-400"><span class="spinner"></span><p class="mt-3 text-sm">読み込み中…</p></div>';
+  $("tag-editor").value = (state.progress.__fileTags?.[file.id]?.tags || []).join(", ");
+  const viewer = $("markdown-viewer");
+  viewer.innerHTML = '<div class="text-center py-12 text-slate-400"><span class="spinner"></span><p class="mt-3 text-sm">読み込み中…</p></div>';
   setProgressStatus("閲覧位置を確認中…");
 
   try {
     if (!file.id) throw new Error("ファイルIDがありません。OneDrive一覧を再同期してください。");
-    const response = await downloadDriveItem(file.id, state.openController.signal);
+    const response = await downloadDriveItem(file.id, signal);
     if (!response.ok) throw new Error("本文のダウンロードに失敗しました（" + response.status + "）。");
     const markdown = await response.text();
     if (requestId !== state.openRequest) return;
+    cacheFullText(file, markdown);
 
     const rawHtml = marked.parse(markdown, { gfm: true, breaks: false });
     const cleanHtml = DOMPurify.sanitize(rawHtml, {
       USE_PROFILES: { html: true },
       ADD_ATTR: ["target", "rel"]
     });
-    $("markdown-viewer").innerHTML = cleanHtml;
+    const tpl = document.createElement("template");
+    tpl.innerHTML = cleanHtml;
+    const relativeImages = detachRelativeImages(tpl.content);
+    viewer.replaceChildren(tpl.content);
+
     prepareMarkdownBlocks();
     buildTableOfContents();
     applySavedAnnotations(file.id);
     applyReaderSettings();
-    await waitForLayoutStable($("markdown-viewer"));
-    await pollRemoteProgress();
+    if (relativeImages.length) {
+      // 画像が揃うのを少し待つ（位置復元のズレ防止）。間に合わない分は裏で読み込みを続ける
+      await Promise.race([loadRelativeImages(file, relativeImages, signal, requestId), sleep(CONFIG.IMAGE_WAIT_MS)]);
+    }
+    await waitForLayoutStable(viewer);
+    if (requestId !== state.openRequest) return;
+    await pollRemoteProgress(true);
+    if (requestId !== state.openRequest) return;
     const saved = state.progress[file.id];
     state.suppressScrollUntil = Date.now() + 900;
     state.restoringPosition = true;
     restoreReadingPosition(saved);
     requestAnimationFrame(() => { state.restoringPosition = false; });
     updateReadingProgress();
+    syncTocCurrent();
     renderAnnotations();
     setProgressStatus(saved ? "閲覧位置を復元しました" : "新規ファイル");
-    $("markdown-viewer").onscroll = () => {
-      if (state.restoringPosition || Date.now() < state.suppressScrollUntil) return;
-      state.lastLocalInteractionAt = Date.now();
-      updateReadingProgress();
-      scheduleProgressSave(file.id);
-    };
-    document.querySelectorAll(".file-row").forEach(el => el.classList.toggle("active", el.dataset.fileId === file.id));
+    state.viewerReady = true;
   } catch (err) {
     if (err.name === "AbortError") return;
     console.error(err);
-    $("markdown-viewer").textContent = "本文の読み込みに失敗しました：" + errorMessage(err);
+    viewer.textContent = "本文の読み込みに失敗しました：" + describeError(err);
     setProgressStatus("読み込み失敗");
   }
 }
 
 /* =========================
-   読書位置アンカー（v3.3）
+   読書位置アンカー（v3.3〜）
+   v3.7：ブロックのフィンガープリント・見出しパスを開いた時に1回だけ計算してキャッシュ
    ========================= */
 const BLOCK_SELECTOR = "h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,figure";
 function normalizeText(value) { return String(value||"").replace(/\s+/g," ").trim().toLocaleLowerCase(); }
@@ -815,49 +1085,66 @@ function fingerprint(value) {
   return (h>>>0).toString(16);
 }
 function blockText(el) { return (el.innerText || el.textContent || "").replace(/\s+/g," ").trim().slice(0,1200); }
-function headingPathFor(el) {
-  const viewer=$("markdown-viewer"), nodes=[...viewer.querySelectorAll("h1,h2,h3,h4,h5,h6")];
-  const current=nodes.filter(h=>h.compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING);
-  const path=[]; let levels={};
-  for(const h of current){const level=Number(h.tagName.substring(1)); levels[level]=normalizeText(h.textContent); for(let k=level+1;k<=6;k++)delete levels[k];}
-  for(let i=1;i<=6;i++)if(levels[i])path.push(levels[i]);
-  return path;
-}
-function getContentBlocks() { return [...$("markdown-viewer").querySelectorAll(BLOCK_SELECTOR)].filter(el=>blockText(el).length>0); }
 function prepareMarkdownBlocks() {
-  getContentBlocks().forEach((el,i)=>{el.dataset.readerBlock="1";el.dataset.readerIndex=String(i);});
+  const viewer = $("markdown-viewer");
+  const levels = {};
+  const blocks = [];
+  const byFp = new Map();
+  for (const el of viewer.querySelectorAll(BLOCK_SELECTOR)) {
+    const text = blockText(el);
+    if (!text) continue;
+    // 見出しパスは「そのブロックより前にある見出し」で決まる（見出し自身は自分のパスに含めない）
+    const hp = [1,2,3,4,5,6].filter(i => levels[i]).map(i => levels[i]);
+    if (/^H[1-6]$/.test(el.tagName)) {
+      const lv = Number(el.tagName.slice(1));
+      levels[lv] = normalizeText(el.textContent);
+      for (let k = lv + 1; k <= 6; k++) delete levels[k];
+    }
+    const fp = fingerprint(text);
+    const block = { el, fp, hp, hpKey: hp.join("/"), text: text.slice(0,240) };
+    blocks.push(block);
+    if (!byFp.has(fp)) byFp.set(fp, []);
+    byFp.get(fp).push(block);
+  }
+  state.blocks = blocks;
+  state.blocksByFp = byFp;
 }
 function captureReadingPosition() {
-  const viewer=$("markdown-viewer"), blocks=getContentBlocks();
-  if(!blocks.length)return {scrollTop:viewer.scrollTop,scrollRatio:viewer.scrollHeight>viewer.clientHeight?viewer.scrollTop/(viewer.scrollHeight-viewer.clientHeight):0};
+  const viewer=$("markdown-viewer"), blocks=state.blocks;
+  const ratio=viewer.scrollHeight>viewer.clientHeight?viewer.scrollTop/(viewer.scrollHeight-viewer.clientHeight):0;
+  if(!blocks.length)return {scrollTop:viewer.scrollTop,scrollRatio:ratio};
   const vr=viewer.getBoundingClientRect(), targetY=vr.top+Math.min(90,viewer.clientHeight*.15);
-  let block=blocks.find(el=>{const r=el.getBoundingClientRect();return r.top<=targetY && r.bottom>=targetY;});
-  if(!block) block=blocks.find(el=>el.getBoundingClientRect().top>targetY) || blocks[blocks.length-1];
-  const rect=block.getBoundingClientRect(), text=blockText(block), fp=fingerprint(text);
-  const same=blocks.filter(el=>fingerprint(blockText(el))===fp);
+  // 文書順に並んだブロックから、上端が基準線以上にある最後のブロックを二分探索
+  let lo=0, hi=blocks.length-1, idx=-1;
+  while(lo<=hi){const mid=(lo+hi)>>1; if(blocks[mid].el.getBoundingClientRect().top<=targetY){idx=mid;lo=mid+1;}else hi=mid-1;}
+  let block;
+  if(idx<0) block=blocks[0];
+  else { block = blocks[idx].el.getBoundingClientRect().bottom>=targetY ? blocks[idx] : (blocks[idx+1]||blocks[idx]); }
+  const rect=block.el.getBoundingClientRect();
   return {
-    anchorVersion:1, headingPath:headingPathFor(block), blockType:block.tagName.toLowerCase(),
-    blockFingerprint:fp, blockText:text.slice(0,240), occurrence:same.indexOf(block),
+    anchorVersion:1, headingPath:block.hp, blockType:block.el.tagName.toLowerCase(),
+    blockFingerprint:block.fp, blockText:block.text, occurrence:state.blocksByFp.get(block.fp).indexOf(block),
     blockProgress:rect.height>0?Math.max(0,Math.min(1,(targetY-rect.top)/rect.height)):0,
     viewportFraction:viewer.clientHeight?Math.min(.2,90/viewer.clientHeight):.1,
     scrollTop:viewer.scrollTop,
-    scrollRatio:viewer.scrollHeight>viewer.clientHeight?viewer.scrollTop/(viewer.scrollHeight-viewer.clientHeight):0
+    scrollRatio:ratio
   };
 }
 function restoreReadingPosition(saved) {
   const viewer=$("markdown-viewer"); if(!saved){viewer.scrollTop=0;return;}
-  const blocks=getContentBlocks(); let target=null;
+  const blocks=state.blocks; let target=null;
   if(saved.blockFingerprint && blocks.length){
-    let candidates=blocks.filter(el=>fingerprint(blockText(el))===saved.blockFingerprint);
+    let candidates=state.blocksByFp.get(saved.blockFingerprint)||[];
     if(candidates.length){
-      const path=(saved.headingPath||[]).join("/"), matched=candidates.filter(el=>headingPathFor(el).join("/")===path);
+      const path=(saved.headingPath||[]).join("/"), matched=candidates.filter(b=>b.hpKey===path);
       if(matched.length)candidates=matched;
-      target=candidates[Math.max(0,Math.min(candidates.length-1,Number(saved.occurrence)||0))];
+      target=candidates[Math.max(0,Math.min(candidates.length-1,Number(saved.occurrence)||0))].el;
     }
   }
   if(!target && saved.blockText && blocks.length){
     const needle=normalizeText(saved.blockText).slice(0,100);
-    target=blocks.find(el=>normalizeText(blockText(el)).includes(needle));
+    const hit=blocks.find(b=>normalizeText(blockText(b.el)).includes(needle));
+    if(hit) target=hit.el;
   }
   if(target){
     const rect=target.getBoundingClientRect(), vr=viewer.getBoundingClientRect();
@@ -872,7 +1159,7 @@ function restoreReadingPosition(saved) {
 }
 async function waitForLayoutStable(viewer) {
   try { if(document.fonts?.ready) await Promise.race([document.fonts.ready,new Promise(r=>setTimeout(r,1200))]); } catch(_){}
-  const images=[...viewer.querySelectorAll("img")];
+  const images=[...viewer.querySelectorAll("img")].filter(img=>img.getAttribute("src"));
   await Promise.race([Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.addEventListener("load",resolve,{once:true});img.addEventListener("error",resolve,{once:true});}))),new Promise(r=>setTimeout(r,1800))]);
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
 }
@@ -881,26 +1168,35 @@ async function waitForLayoutStable(viewer) {
    閲覧位置の同期
    OneDrive上のJSONを端末間で共有
    ========================= */
+function emptyProgressDoc() {
+  return { version: 5, items: {}, __registrations: {}, __groups: [], __annotations: {}, __fileTags: {}, __readingQueue: [] };
+}
+function isNewerOrSame(a, b) { return new Date(a?.updatedAt || 0) >= new Date(b?.updatedAt || 0); }
+/* 削除済み(deleted:true)の墓標は一定期間残し、他端末の古いデータが復活するのを防ぐ */
+function keepRecord(x) {
+  if (!x.deleted) return true;
+  return Date.now() - new Date(x.updatedAt || 0).getTime() < CONFIG.TOMBSTONE_TTL_DAYS * 86400000;
+}
 function mergeProgress(a, b) {
-  const merged = { version: 5, items: {}, __registrations: {}, __groups: [], __annotations: {}, __fileTags: {}, __readingQueue: [] };
+  const merged = emptyProgressDoc();
   const allIds = new Set([...Object.keys(a?.items || {}), ...Object.keys(b?.items || {})]);
   for (const id of allIds) {
     const av = a?.items?.[id], bv = b?.items?.[id];
     if (!av) merged.items[id] = bv;
     else if (!bv) merged.items[id] = av;
-    else merged.items[id] = (new Date(av.updatedAt || 0) >= new Date(bv.updatedAt || 0)) ? av : bv;
+    else merged.items[id] = isNewerOrSame(av, bv) ? av : bv;
   }
   const regIds = new Set([...Object.keys(a?.__registrations || {}), ...Object.keys(b?.__registrations || {})]);
   for (const id of regIds) {
     const av = a?.__registrations?.[id], bv = b?.__registrations?.[id];
     if (!av) merged.__registrations[id] = bv;
     else if (!bv) merged.__registrations[id] = av;
-    else merged.__registrations[id] = (new Date(av.updatedAt || 0) >= new Date(bv.updatedAt || 0)) ? av : bv;
+    else merged.__registrations[id] = isNewerOrSame(av, bv) ? av : bv;
   }
   const groupMap=new Map();
   for(const g of [...(a?.__groups||[]),...(b?.__groups||[])]) {
     if(!g?.id)continue; const old=groupMap.get(g.id);
-    if(!old || new Date(g.updatedAt||0)>=new Date(old.updatedAt||0))groupMap.set(g.id,g);
+    if(!old || isNewerOrSame(g, old))groupMap.set(g.id,g);
   }
   merged.__groups=[...groupMap.values()];
   const annotationIds=new Set([...Object.keys(a?.__annotations||{}),...Object.keys(b?.__annotations||{})]);
@@ -908,39 +1204,52 @@ function mergeProgress(a, b) {
     const byId=new Map();
     for(const item of [...(a?.__annotations?.[fileId]||[]),...(b?.__annotations?.[fileId]||[])]){
       if(!item?.id)continue; const old=byId.get(item.id);
-      if(!old || new Date(item.updatedAt||0)>=new Date(old.updatedAt||0))byId.set(item.id,item);
+      if(!old || isNewerOrSame(item, old))byId.set(item.id,item);
     }
-    merged.__annotations[fileId]=[...byId.values()].filter(x=>!x.deleted);
+    const list=[...byId.values()].filter(keepRecord);
+    if(list.length)merged.__annotations[fileId]=list;
   }
   const tagIds=new Set([...Object.keys(a?.__fileTags||{}),...Object.keys(b?.__fileTags||{})]);
   for(const fileId of tagIds){
     const av=a?.__fileTags?.[fileId], bv=b?.__fileTags?.[fileId];
-    merged.__fileTags[fileId]=!av?bv:!bv?av:(new Date(av.updatedAt||0)>=new Date(bv.updatedAt||0)?av:bv);
+    merged.__fileTags[fileId]=!av?bv:!bv?av:(isNewerOrSame(av, bv)?av:bv);
   }
   const queueMap=new Map();
   for(const q of [...(a?.__readingQueue||[]),...(b?.__readingQueue||[])]){
     if(!q?.fileId)continue; const old=queueMap.get(q.fileId);
-    if(!old || new Date(q.updatedAt||0)>=new Date(old.updatedAt||0))queueMap.set(q.fileId,q);
+    if(!old || isNewerOrSame(q, old))queueMap.set(q.fileId,q);
   }
-  merged.__readingQueue=[...queueMap.values()].filter(q=>!q.deleted);
+  merged.__readingQueue=[...queueMap.values()].filter(keepRecord);
   return merged;
 }
-async function getRemoteProgressSnapshot() {
-  let meta;
+/* 進捗ファイルのメタ情報（id・eTag）だけを軽く取得。ファイルが無ければnull */
+async function fetchProgressMeta() {
   try {
-    meta = await graphJson(`/me/drive/root:/${encodeURIComponent(CONFIG.PROGRESS_FILE)}?$select=id,eTag`);
+    return await graphJson(`/me/drive/root:/${encodeURIComponent(CONFIG.PROGRESS_FILE)}?$select=id,eTag`);
   } catch (err) {
-    if (/Graph APIエラー 404/.test(errorMessage(err))) {
-      return { data: { version: 5, items: {}, __registrations: {}, __groups: [], __annotations: {}, __fileTags: {}, __readingQueue: [] }, id: null, eTag: null };
+    if (err instanceof GraphError && err.status === 404) {
+      // 一度でも存在を確認したファイルが急に404になった場合は、空データ扱いにせず中断する（上書き事故の防止）
+      if (state.progressFileSeen) throw new GraphError(404, "読書履歴ファイルを一時的に取得できませんでした。しばらくしてから再試行します。");
+      return null;
     }
     throw err;
   }
+}
+async function getRemoteProgressSnapshot(knownMeta) {
+  const meta = knownMeta === undefined ? await fetchProgressMeta() : knownMeta;
+  if (!meta) return { data: emptyProgressDoc(), id: null, eTag: null };
   const response = await graphRequest(`/me/drive/items/${encodeURIComponent(meta.id)}/content`);
   const raw = await response.text();
   let data;
   try { data = JSON.parse(raw || "{}"); }
-  catch (_) { throw new Error("reading-progress.jsonのJSON形式が不正です。元ファイルを保護するため上書きしません。"); }
-  if (!data || typeof data !== "object") data = { version: 5, items: {}, __registrations: {}, __groups: [], __annotations: {}, __fileTags: {}, __readingQueue: [] };
+  catch (_) {
+    const e = new Error("reading-progress.jsonのJSON形式が不正です。元ファイルを保護するため上書きしません。");
+    e.code = "BAD_JSON";
+    throw e;
+  }
+  if (!data || typeof data !== "object") data = emptyProgressDoc();
+  state.progressFileSeen = true;
+  state.remoteETag = meta.eTag || null;
   return { data, id: meta.id, eTag: meta.eTag || null };
 }
 async function downloadProgressFile() {
@@ -965,13 +1274,14 @@ function markLocalProgress(fileId, position) {
   state.pendingLocalFileIds.add(fileId);
   state.progressDirty = true;
   state.lastLocalSavedAt = state.lastLocalInteractionAt;
-  try { localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress)); } catch (_) {}
+  persistLocalProgress();
 }
 function scheduleProgressSave(fileId) {
   if (!fileId) return;
   clearTimeout(state.saveTimer);
   setProgressStatus("未保存の変更あり");
   state.saveTimer = setTimeout(() => {
+    if (!state.viewerReady || state.currentFile?.id !== fileId) return;
     markLocalProgress(fileId, captureReadingPosition());
     queueProgressSave();
   }, CONFIG.SAVE_DELAY);
@@ -996,7 +1306,7 @@ async function queueProgressSave() {
     state.progressBusy = true;
     setProgressStatus("OneDriveに保存中…");
     try {
-      // ETagによる条件付き更新。競合(412)時は再取得・再マージして最大3回試行。
+      // ETagによる条件付き更新。競合(409/412)時は再取得・再マージして最大3回試行。
       let saved = false;
       for (let attempt = 0; attempt < 3 && !saved; attempt++) {
         const revisionAtStart = state.localRevision;
@@ -1005,7 +1315,10 @@ async function queueProgressSave() {
         const merged = mergeProgress(remoteSnapshot.data, localSnapshot);
         try {
           const response = await uploadProgressFile(merged, remoteSnapshot);
-          if (!response.ok) throw new Error("読書履歴の保存に失敗しました（" + response.status + "）。");
+          // 自分の書き込み後のeTagを覚え、次のポーリングで無駄な再取得をしない
+          const info = await response.json().catch(() => null);
+          state.remoteETag = info?.eTag || null;
+          state.progressFileSeen = true;
           const latestLocal = toProgressDocument(state.progress);
           const combined = mergeProgress(merged, latestLocal);
           state.progress = fromProgressDocument(combined);
@@ -1019,31 +1332,40 @@ async function queueProgressSave() {
               if (new Date(item.updatedAt || 0) > new Date(merged.items?.[id]?.updatedAt || 0)) state.pendingLocalFileIds.add(id);
             }
           }
-          try { localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress)); } catch (_) {}
+          persistLocalProgress();
           saved = true;
         } catch (err) {
-          if (!/Graph APIエラー 412|status 412|HTTP 412/i.test(errorMessage(err)) || attempt === 2) throw err;
+          const conflict = err instanceof GraphError && (err.status === 412 || err.status === 409);
+          if (!conflict || attempt === 2) throw err;
         }
       }
       if (!saved) throw new Error("他端末との更新競合が続いたため保存できませんでした。");
-      refreshRegisteredFiles();
-      applyFilter();
+      syncListView();
       setProgressStatus("OneDrive同期済み");
     } catch (err) {
       console.error(err);
+      const reason = describeError(err);
       setProgressStatus("同期失敗（端末内に退避済み）");
-      showToast("読書位置のOneDrive同期に失敗しました。通信回復後に再試行します。", 6000);
+      // 定期再送のたびに通知が出続けないよう、通知は1分に1回まで
+      if (Date.now() - state.lastSaveErrorToastAt > 60000) {
+        state.lastSaveErrorToastAt = Date.now();
+        showToast("読書位置のOneDrive同期に失敗しました。" + reason, 7000);
+      }
     } finally {
       state.progressBusy = false;
     }
   }).catch(err => console.error("保存キューエラー", err));
   return state.saveChain;
 }
-async function pollRemoteProgress() {
+async function pollRemoteProgress(force = false) {
   if (!state.account || state.pollInFlight || state.progressBusy || document.visibilityState === "hidden") return;
   state.pollInFlight = true;
   try {
-    const remote = await getRemoteProgressSnapshot();
+    // まずeTagだけ確認。前回と同じなら本文をダウンロードしない
+    const meta = await fetchProgressMeta();
+    if (!meta) return;
+    if (!force && meta.eTag && meta.eTag === state.remoteETag) return;
+    const remote = await getRemoteProgressSnapshot(meta);
     const remoteDoc = remote.data;
     const currentId = state.currentFile?.id;
     const remoteItem = currentId ? remoteDoc.items?.[currentId] : null;
@@ -1055,9 +1377,10 @@ async function pollRemoteProgress() {
     // 他端末の新しい位置は、こちらで操作中でない場合だけ自動反映する。
     if (remoteIsNewer && !hasPendingCurrent && !userIsActive) {
       state.progress[currentId] = remoteItem;
-      if (state.currentFile?.id === currentId) {
+      if (state.currentFile?.id === currentId && state.viewerReady) {
         state.suppressScrollUntil = Date.now() + 500;
         state.restoringPosition = true; restoreReadingPosition(remoteItem); requestAnimationFrame(()=>{state.restoringPosition=false;});
+        syncTocCurrent();
         setProgressStatus("別端末の最新位置を反映しました");
       }
     }
@@ -1074,11 +1397,11 @@ async function pollRemoteProgress() {
     state.groups = state.progress.__groups || [];
     state.fileTags = state.progress.__fileTags || {};
     state.readingQueue = state.progress.__readingQueue || [];
-    renderGroupSelect();
     state.lastRemoteProgress = remoteDoc;
-    try { localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress)); } catch (_) {}
-    refreshRegisteredFiles();
-    applyFilter();
+    persistLocalProgress();
+    syncListView();
+    if (!$("annotations-panel").classList.contains("hidden")) renderAnnotations();
+    if (!$("queue-panel").classList.contains("hidden")) renderQueuePanel();
   } catch (err) {
     console.warn("読書位置の定期確認に失敗:", err);
   } finally {
@@ -1091,15 +1414,15 @@ function startProgressSync() {
   state.periodicSaveTimer = setInterval(() => {
     if (state.progressDirty || state.pendingLocalFileIds.size) {
       queueProgressSave(); // 前回失敗した未同期データ・登録変更を再送
-    } else if (state.currentFile && state.lastLocalInteractionAt > state.lastLocalSavedAt &&
+    } else if (state.currentFile && state.viewerReady && state.lastLocalInteractionAt > state.lastLocalSavedAt &&
                Date.now() - state.lastLocalInteractionAt < CONFIG.PERIODIC_SAVE_INTERVAL * 2) {
       // 操作中にスクロールイベントが続き、デバウンス保存が発火しない場合の保険。
       markLocalProgress(state.currentFile.id, captureReadingPosition());
       queueProgressSave();
     }
   }, CONFIG.PERIODIC_SAVE_INTERVAL);
-  state.remotePollTimer = setInterval(pollRemoteProgress, CONFIG.REMOTE_POLL_INTERVAL);
-  window.addEventListener("focus", pollRemoteProgress);
+  state.remotePollTimer = setInterval(() => pollRemoteProgress(), CONFIG.REMOTE_POLL_INTERVAL);
+  window.addEventListener("focus", () => pollRemoteProgress());
 }
 async function loadProgress() {
   const backup = (() => {
@@ -1107,14 +1430,21 @@ async function loadProgress() {
     catch (_) { return {}; }
   })();
   const backupDoc = toProgressDocument(backup);
-  const remote = await downloadProgressFile();
+  let remote = null;
+  try {
+    remote = await downloadProgressFile();
+  } catch (err) {
+    // 取得に失敗しても端末内のバックアップで起動する（保存時に改めてマージされる）
+    console.warn(err);
+    showToast("OneDriveの読書履歴を取得できませんでした。端末内のデータで開始します。" + describeError(err), 8000);
+  }
   const merged = mergeProgress(remote, backupDoc);
   state.progress = fromProgressDocument(merged);
   state.groups = state.progress.__groups || [];
   state.fileTags = state.progress.__fileTags || {};
   state.readingQueue = state.progress.__readingQueue || [];
   state.lastRemoteProgress = remote;
-  localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress));
+  persistLocalProgress();
 }
 /* =========================
    アプリ起動
@@ -1127,6 +1457,8 @@ async function startApp() {
   await loadProgress();
   renderGroupSelect();
   await loadFileIndex();
+  const lastSync = (await idbGet("meta", "lastSync").catch(() => null))?.value;
+  if (lastSync) $("sync-time").textContent = fmtDateTime(new Date(lastSync));
   const cachedCount = state.files.length;
 
   if (cachedCount) {
@@ -1139,7 +1471,7 @@ async function startApp() {
 }
 async function flushProgress() {
   clearTimeout(state.saveTimer);
-  if (state.currentFile && state.lastLocalInteractionAt > state.lastLocalSavedAt) {
+  if (state.currentFile && state.viewerReady && state.lastLocalInteractionAt > state.lastLocalSavedAt) {
     markLocalProgress(state.currentFile.id, captureReadingPosition());
     await queueProgressSave();
   } else if (state.progressDirty || state.pendingLocalFileIds.size) {
@@ -1148,7 +1480,7 @@ async function flushProgress() {
 }
 
 /* =========================
-   v3.4 読書支援機能
+   読書支援機能
    ========================= */
 function applyReaderSettings(){
   let cfg={};try{cfg=JSON.parse(localStorage.getItem("md_reader_settings")||"{}");}catch(_){}
@@ -1162,69 +1494,272 @@ function saveReaderSettings(){
   try{localStorage.setItem("md_reader_settings",JSON.stringify(cfg));}catch(_){}
   applyReaderSettings();
 }
+
+/* ---- 目次（現在位置のハイライト付き） ---- */
 function buildTableOfContents(){
   const panel=$("toc-panel"), headings=[...$("markdown-viewer").querySelectorAll("h1,h2,h3,h4,h5,h6")];
   panel.innerHTML="";
-  if(!headings.length){panel.innerHTML='<div class="text-slate-400 p-2">見出しはありません</div>';return;}
-  headings.forEach((h,i)=>{const id="reader-heading-"+i;h.id=id;const b=document.createElement("button");b.textContent=h.textContent.trim()||"（無題）";b.style.paddingLeft=(.35+(Number(h.tagName.slice(1))-1)*.55)+"rem";b.addEventListener("click",()=>{h.scrollIntoView({behavior:"smooth",block:"start"});});panel.appendChild(b);});
+  state.headings=headings; state.tocButtons=[]; state.tocCurrent=-1;
+  if(!headings.length){panel.innerHTML='<div class="text-slate-400 p-2">見出しはありません</div>';setupTocObserver([]);return;}
+  headings.forEach((h,i)=>{
+    h.id="reader-heading-"+i;
+    const b=document.createElement("button");
+    b.type="button";
+    b.textContent=h.textContent.trim()||"（無題）";
+    b.style.paddingLeft=(.35+(Number(h.tagName.slice(1))-1)*.55)+"rem";
+    b.addEventListener("click",()=>{h.scrollIntoView({behavior:"smooth",block:"start"});});
+    panel.appendChild(b);
+    state.tocButtons.push(b);
+  });
+  setupTocObserver(headings);
+}
+function setTocCurrent(i){
+  if(i===state.tocCurrent)return;
+  state.tocCurrent=i;
+  state.tocButtons.forEach((b,k)=>b.classList.toggle("toc-active",k===i));
+  const btn=state.tocButtons[i], panel=$("toc-panel");
+  if(btn && !panel.classList.contains("hidden")){
+    // ページ全体を動かさず、目次パネルの中だけでスクロールする
+    const top=btn.offsetTop, bottom=top+btn.offsetHeight;
+    if(top<panel.scrollTop)panel.scrollTop=Math.max(0,top-8);
+    else if(bottom>panel.scrollTop+panel.clientHeight)panel.scrollTop=bottom-panel.clientHeight+8;
+  }
+}
+function setupTocObserver(headings){
+  if(state.tocObserver){state.tocObserver.disconnect();state.tocObserver=null;}
+  if(!headings.length||!("IntersectionObserver" in window))return;
+  const indexOf=new Map(headings.map((h,i)=>[h,i]));
+  // 画面上部15%の帯に見出しが入ったら「現在の見出し」とする
+  state.tocObserver=new IntersectionObserver(entries=>{
+    for(const e of entries){
+      const i=indexOf.get(e.target); if(i===undefined)continue;
+      if(e.isIntersecting)setTocCurrent(i);
+      else if(e.rootBounds && e.boundingClientRect.top>=e.rootBounds.top)setTocCurrent(i-1); // 上へ戻って帯の下に出た
+    }
+  },{root:$("markdown-viewer"),rootMargin:"0px 0px -85% 0px",threshold:0});
+  headings.forEach(h=>state.tocObserver.observe(h));
+}
+/* 位置ジャンプ後など、観測が追いつかない場面で現在の見出しを1回計算する */
+function syncTocCurrent(){
+  if(!state.headings.length)return;
+  const viewer=$("markdown-viewer"), threshold=viewer.getBoundingClientRect().top+viewer.clientHeight*.15;
+  let cur=-1;
+  for(let i=0;i<state.headings.length;i++){
+    if(state.headings[i].getBoundingClientRect().top<=threshold)cur=i; else break;
+  }
+  setTocCurrent(cur);
 }
 function updateReadingProgress(){const v=$("markdown-viewer"),max=v.scrollHeight-v.clientHeight;$("reading-progress-fill").style.width=(max>0?Math.max(0,Math.min(100,v.scrollTop/max*100)):0)+"%";}
-function getSelectionText(){return String(window.getSelection()?.toString()||"").trim();}
+
+/* ---- 注釈（ハイライト・メモ・しおり） ---- */
 function annotationList(fileId){state.progress.__annotations=state.progress.__annotations||{};return state.progress.__annotations[fileId]||(state.progress.__annotations[fileId]=[]);}
+/* 削除済み(墓標)を除いた注釈。表示・出力はこちらを使う */
+function activeAnnotations(fileId){return ((state.progress.__annotations||{})[fileId]||[]).filter(x=>!x.deleted);}
 function persistAnnotation(fileId,item){
   const list=annotationList(fileId),idx=list.findIndex(x=>x.id===item.id);if(idx>=0)list[idx]=item;else list.push(item);
-  state.localRevision++;state.progressDirty=true;persistLocalProgress();queueProgressSave();
+  markProgressChanged();queueProgressSave();
+}
+/* 選択範囲を、文書全体のテキスト上の位置＋前後の文脈つきで記録する（同じ文言が複数あっても正しい場所に付けるため） */
+function captureSelectionInfo(){
+  const viewer=$("markdown-viewer"), sel=window.getSelection();
+  let range=null;
+  if(sel && sel.rangeCount && !sel.isCollapsed){
+    const r=sel.getRangeAt(0);
+    if(viewer.contains(r.commonAncestorContainer))range=r.cloneRange();
+  }
+  // iOSではボタンを押した瞬間に選択が解除されることがあるため、直前の選択を保持して使う
+  if(!range && state.lastSel && Date.now()-state.lastSel.time<20000 && viewer.contains(state.lastSel.range.commonAncestorContainer))range=state.lastSel.range.cloneRange();
+  if(!range)return null;
+  const raw=range.toString(), trimmed=raw.trim();
+  if(!trimmed)return null;
+  const quote=trimmed.slice(0,3000);
+  const lead=raw.length-raw.trimStart().length;
+  const pre=document.createRange();
+  pre.setStart(viewer,0); pre.setEnd(range.startContainer,range.startOffset);
+  const start=pre.toString().length+lead;
+  const full=viewer.textContent;
+  return {
+    quote, start,
+    prefix:full.slice(Math.max(0,start-20),start),
+    suffix:full.slice(start+quote.length,start+quote.length+20)
+  };
+}
+function collectTextNodes(root){
+  const nodes=[]; let pos=0, full="";
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+  let n; while((n=walker.nextNode())){const len=n.nodeValue.length;nodes.push({node:n,start:pos,end:pos+len});pos+=len;full+=n.nodeValue;}
+  return {nodes,full};
+}
+function escapeRegExp(s){return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");}
+/* 注釈の位置を探す：完全一致→前後文脈・元の位置で最有力を選ぶ。旧形式データは空白ゆるめ一致で救済 */
+function findAnnotationRange(full,a){
+  const q=a.quote; if(!q)return null;
+  let best=-1,bestScore=-1,bestDist=Infinity,from=0,i;
+  while((i=full.indexOf(q,from))!==-1){
+    let score=0;
+    if(a.prefix && full.slice(Math.max(0,i-a.prefix.length),i)===a.prefix)score+=2;
+    if(a.suffix && full.slice(i+q.length,i+q.length+a.suffix.length)===a.suffix)score+=2;
+    const dist=Number.isFinite(a.start)?Math.abs(i-a.start):i;
+    if(score>bestScore||(score===bestScore&&dist<bestDist)){best=i;bestScore=score;bestDist=dist;}
+    from=i+1;
+  }
+  if(best>=0)return {index:best,length:q.length};
+  try{
+    const m=new RegExp(escapeRegExp(q).replace(/\s+/g,"\\s+")).exec(full);
+    if(m)return {index:m.index,length:m[0].length};
+  }catch(_){}
+  return null;
+}
+const STRUCTURAL_TAGS=new Set(["UL","OL","TABLE","THEAD","TBODY","TFOOT","TR"]);
+function wrapTextRange(nodes,startPos,endPos,id,className){
+  let wrapped=0;
+  for(const item of nodes){
+    if(item.end<=startPos||item.start>=endPos)continue;
+    const node=item.node;
+    if(!node.parentNode)continue;
+    const text=node.nodeValue;
+    if(!text.trim()&&STRUCTURAL_TAGS.has(node.parentNode.nodeName))continue; // リストや表の隙間の空白には付けない
+    const localStart=Math.max(startPos,item.start)-item.start;
+    const localEnd=Math.min(endPos,item.end)-item.start;
+    if(localEnd<=localStart)continue;
+    if(localEnd<text.length)node.splitText(localEnd);
+    const target=localStart>0?node.splitText(localStart):node;
+    const mark=document.createElement("mark");
+    mark.className=className; mark.dataset.annotationId=id;
+    target.parentNode.insertBefore(mark,target);
+    mark.appendChild(target);
+    wrapped++;
+  }
+  return wrapped>0;
+}
+/* 1件の注釈を本文に反映。位置が見つからなければfalse（注釈一覧に「位置不明」と表示） */
+function applyOneAnnotation(a){
+  const root=$("markdown-viewer");
+  const {nodes,full}=collectTextNodes(root);
+  const found=findAnnotationRange(full,a);
+  if(!found)return false;
+  return wrapTextRange(nodes,found.index,found.index+found.length,a.id,a.type==="note"?"reader-note":"reader-highlight");
 }
 function applySavedAnnotations(fileId){
-  const list=(state.progress.__annotations||{})[fileId]||[];if(!list.length)return;
-  const root=$("markdown-viewer");
-  for(const a of list.filter(x=>x.type==="highlight"&&x.quote)){
-    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement?.closest("mark,script,style")?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
-    let node,done=false;while((node=walker.nextNode())){const at=node.nodeValue.indexOf(a.quote);if(at<0)continue;const range=document.createRange();range.setStart(node,at);range.setEnd(node,at+a.quote.length);const mark=document.createElement("mark");mark.className="reader-highlight";try{range.surroundContents(mark);done=true;}catch(_){}if(done)break;}
+  state.orphanIds.clear();
+  for(const a of activeAnnotations(fileId)){
+    if((a.type==="highlight"||a.type==="note")&&a.quote){
+      if(!applyOneAnnotation(a))state.orphanIds.add(a.id);
+    }
   }
+}
+function removeAnnotationMarks(id){
+  $("markdown-viewer").querySelectorAll('mark[data-annotation-id="'+id+'"]').forEach(m=>{
+    const parent=m.parentNode; if(!parent)return;
+    while(m.firstChild)parent.insertBefore(m.firstChild,m);
+    parent.removeChild(m); parent.normalize();
+  });
 }
 function addHighlight(){
   if(!state.currentFile)return showToast("先にMarkdownファイルを開いてください。");
-  const quote=getSelectionText();if(!quote)return showToast("マーカーを付ける文章を選択してください。");
-  persistAnnotation(state.currentFile.id,{id:"a_"+crypto.randomUUID(),type:"highlight",quote:quote.slice(0,1500),updatedAt:new Date().toISOString()});
-  applySavedAnnotations(state.currentFile.id);
+  const info=captureSelectionInfo();
+  if(!info)return showToast("マーカーを付ける文章を選択してください。");
+  const item={id:"a_"+crypto.randomUUID(),type:"highlight",...info,updatedAt:new Date().toISOString()};
+  persistAnnotation(state.currentFile.id,item);
+  if(!applyOneAnnotation(item))state.orphanIds.add(item.id);
+  state.lastSel=null; window.getSelection()?.removeAllRanges();
+  renderAnnotations();
   showToast("選択した文章をハイライトとして保存しました。");
 }
-function addNote(){
+async function addNote(){
   if(!state.currentFile)return showToast("先にMarkdownファイルを開いてください。");
-  const quote=getSelectionText();if(!quote)return showToast("メモを紐づける文章を選択してください。");
-  const note=prompt("選択した文章へのメモを入力してください。");if(!note||!note.trim())return;
-  persistAnnotation(state.currentFile.id,{id:"a_"+crypto.randomUUID(),type:"note",quote:quote.slice(0,1500),note:note.trim(),updatedAt:new Date().toISOString()});
+  const info=captureSelectionInfo();
+  if(!info)return showToast("メモを紐づける文章を選択してください。");
+  const fileId=state.currentFile.id;
+  state.lastSel=null;
+  const note=await showTextModal({title:"選択した文章へのメモ",quote:info.quote.slice(0,120),multiline:true,placeholder:"メモを入力"});
+  if(note===null||!note.trim()||state.currentFile?.id!==fileId)return;
+  const item={id:"a_"+crypto.randomUUID(),type:"note",...info,note:note.trim(),updatedAt:new Date().toISOString()};
+  persistAnnotation(fileId,item);
+  if(!applyOneAnnotation(item))state.orphanIds.add(item.id);
+  window.getSelection()?.removeAllRanges();
   renderAnnotations();showToast("メモを保存しました。");
 }
-function renderAnnotations(){
-  const panel=$("annotations-panel"),items=(state.currentFile?(state.progress.__annotations||{})[state.currentFile.id]||[]:[]).slice().sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
-  panel.innerHTML="";
-  if(!items.length){panel.textContent="この文書に保存された注釈はありません。";return;}
-  items.forEach(item=>{const row=document.createElement("div");row.className="border-b last:border-0 py-2";const head=document.createElement("div");head.className="font-semibold";head.textContent=item.type==="highlight"?"🖍 ハイライト":item.type==="note"?"✎ メモ":"☆ しおり";const quote=document.createElement("div");quote.className="text-slate-500 my-1";quote.textContent=item.quote||item.label||"保存した位置";row.append(head,quote);if(item.note){const note=document.createElement("div");note.textContent=item.note;row.appendChild(note);}if(item.type==="bookmark"&&item.position){const jump=document.createElement("button");jump.className="text-blue-600 underline mt-1";jump.textContent="この位置へ移動";jump.addEventListener("click",()=>restoreReadingPosition(item.position));row.appendChild(jump);}panel.appendChild(row);});
-}
-function addBookmark(){
+async function addBookmark(){
   if(!state.currentFile)return showToast("先にMarkdownファイルを開いてください。");
-  const pos=captureReadingPosition(),quote=getSelectionText();
-  persistAnnotation(state.currentFile.id,{id:"a_"+crypto.randomUUID(),type:"bookmark",quote:quote.slice(0,500),position:pos,label:prompt("しおりの名前（空欄可）",quote.slice(0,40)||"読書メモ")||"しおり",updatedAt:new Date().toISOString()});
+  const fileId=state.currentFile.id;
+  const pos=captureReadingPosition(), quote=(captureSelectionInfo()?.quote||"").slice(0,500);
+  state.lastSel=null;
+  const label=await showTextModal({title:"しおりの名前",value:quote.slice(0,40)||"読書メモ"});
+  if(label===null||state.currentFile?.id!==fileId)return;
+  persistAnnotation(fileId,{id:"a_"+crypto.randomUUID(),type:"bookmark",quote,position:pos,label:label.trim()||"しおり",updatedAt:new Date().toISOString()});
   renderAnnotations();showToast("しおりを保存しました。");
 }
+/* 削除は墓標(deleted:true)として残し、他端末から古い注釈が復活しないようにする */
+function deleteAnnotation(fileId,id){
+  if(!confirm("この注釈を削除しますか？"))return;
+  const item=annotationList(fileId).find(x=>x.id===id); if(!item)return;
+  item.deleted=true; item.updatedAt=new Date().toISOString();
+  removeAnnotationMarks(id); state.orphanIds.delete(id);
+  markProgressChanged(); queueProgressSave(); renderAnnotations();
+}
+function jumpToAnnotation(item){
+  if(item.type==="bookmark"&&item.position){restoreReadingPosition(item.position);syncTocCurrent();return;}
+  const mark=$("markdown-viewer").querySelector('mark[data-annotation-id="'+item.id+'"]');
+  if(mark)mark.scrollIntoView({behavior:"smooth",block:"center"});
+  else showToast("本文中に該当する位置が見つかりません。");
+}
+function renderAnnotations(){
+  const panel=$("annotations-panel"), fileId=state.currentFile?.id;
+  const items=(fileId?activeAnnotations(fileId):[]).slice().sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
+  panel.innerHTML="";
+  if(!items.length){panel.textContent="この文書に保存された注釈はありません。";return;}
+  items.forEach(item=>{
+    const row=document.createElement("div");row.className="border-b last:border-0 py-2";
+    const head=document.createElement("div");head.className="font-semibold";
+    head.textContent=item.type==="highlight"?"🖍 ハイライト":item.type==="note"?"✎ メモ":"☆ "+(item.label||"しおり");
+    if(state.orphanIds.has(item.id)){const o=document.createElement("span");o.className="orphan-label";o.textContent="位置不明";o.title="本文が変更されたため、元の位置が見つかりません";head.appendChild(o);}
+    row.appendChild(head);
+    if(item.quote){const quote=document.createElement("div");quote.className="text-slate-500 my-1";quote.textContent=item.quote;row.appendChild(quote);}
+    if(item.note){const note=document.createElement("div");note.textContent=item.note;row.appendChild(note);}
+    const actions=document.createElement("div");actions.className="mt-1";
+    if(!state.orphanIds.has(item.id)){
+      const jump=document.createElement("button");jump.type="button";jump.className="annotation-action";jump.textContent="この位置へ移動";
+      jump.addEventListener("click",()=>jumpToAnnotation(item));actions.appendChild(jump);
+    }
+    const del=document.createElement("button");del.type="button";del.className="annotation-action";del.textContent="削除";
+    del.addEventListener("click",()=>deleteAnnotation(fileId,item.id));actions.appendChild(del);
+    row.appendChild(actions);
+    panel.appendChild(row);
+  });
+}
+
+/* ---- 全文検索（登録文書）：並列取得・進捗表示・永続キャッシュ ---- */
 async function searchRegisteredMarkdown(){
-  const q=$("fulltext-input").value.trim().toLocaleLowerCase();if(!q)return showToast("検索語を入力してください。");
-  const box=$("fulltext-results");box.classList.remove("hidden");box.textContent="登録文書を検索しています…";
-  const results=[];
-  for(const file of state.registeredFiles){
-    try{
-      let text=state.fullTextCache.get(file.id);
-      if(text===undefined){const response=await downloadDriveItem(file.id);text=await response.text();state.fullTextCache.set(file.id,text);}
-      const lower=text.toLocaleLowerCase();let from=0,count=0;
-      while((from=lower.indexOf(q,from))!==-1&&count<5){const start=Math.max(0,from-90),end=Math.min(text.length,from+q.length+110);results.push({file,excerpt:text.slice(start,end).replace(/\n/g," "),index:from});from+=q.length;count++;}
-    }catch(err){console.warn("全文検索スキップ",file.name,err);}
-  }
+  const needleRaw=$("fulltext-input").value.trim();
+  const q=needleRaw.toLocaleLowerCase();if(!q)return showToast("検索語を入力してください。");
+  const box=$("fulltext-results");box.classList.remove("hidden");
+  const files=state.registeredFiles.filter(f=>!f.isMissing), total=files.length;
+  if(!total){box.textContent="登録済みの文書がありません。";return;}
+  const token=++state.searchToken;
+  const resultsByFile=new Array(total);
+  let cursor=0,done=0;
+  box.textContent=`検索中… 0/${total}`;
+  const worker=async()=>{
+    while(cursor<total&&token===state.searchToken){
+      const index=cursor++,file=files[index];
+      try{
+        const text=await getFullText(file);
+        const lower=text.toLocaleLowerCase();let from=0,count=0;const hits=[];
+        while((from=lower.indexOf(q,from))!==-1&&count<5){const start=Math.max(0,from-90),end=Math.min(text.length,from+q.length+110);hits.push({file,excerpt:text.slice(start,end).replace(/\n/g," "),index:from});from+=q.length;count++;}
+        resultsByFile[index]=hits;
+      }catch(err){console.warn("全文検索スキップ",file.name,err);}
+      done++;
+      if(token===state.searchToken)box.textContent=`検索中… ${done}/${total}`;
+    }
+  };
+  await Promise.all(Array.from({length:Math.min(CONFIG.SEARCH_CONCURRENCY,total)},worker));
+  if(token!==state.searchToken)return; // 新しい検索が始まっていれば結果を捨てる
+  const results=resultsByFile.flat().filter(Boolean);
   box.innerHTML="";
   if(!results.length){box.textContent="一致する文章はありませんでした。";return;}
   const title=document.createElement("div");title.className="px-2 py-1 text-slate-500";title.textContent=`${results.length}件見つかりました`;box.appendChild(title);
-  results.slice(0,100).forEach(r=>{const b=document.createElement("button");b.type="button";b.className="block w-full text-left p-2 border-t hover:bg-slate-50";const strong=document.createElement("strong");strong.className="block";strong.textContent=r.file.name;const small=document.createElement("span");small.className="block text-slate-500 mt-1";small.textContent=r.excerpt;b.append(strong,small);b.addEventListener("click",async()=>{await openFile(r.file);const needle=r.excerpt.trim().slice(0,50);const blocks=getContentBlocks();const hit=blocks.find(el=>normalizeText(blockText(el)).includes(normalizeText(needle).slice(0,35)))||blocks.find(el=>normalizeText(blockText(el)).includes(normalizeText($("fulltext-input").value)));if(hit){hit.scrollIntoView({behavior:"smooth",block:"center"});}showToast(hit?"検索した文章の位置へ移動しました。":"ファイルを開きました。検索語が見つからない場合は本文を確認してください。");});box.appendChild(b);});
+  results.slice(0,100).forEach(r=>{const b=document.createElement("button");b.type="button";b.className="block w-full text-left p-2 border-t hover:bg-slate-50";const strong=document.createElement("strong");strong.className="block";strong.textContent=r.file.name;const small=document.createElement("span");small.className="block text-slate-500 mt-1";small.textContent=r.excerpt;b.append(strong,small);b.addEventListener("click",async()=>{await openFile(r.file);const needle=normalizeText(r.excerpt.trim()).slice(0,35);const hit=state.blocks.find(b2=>normalizeText(blockText(b2.el)).includes(needle))||state.blocks.find(b2=>normalizeText(blockText(b2.el)).includes(normalizeText(needleRaw)));if(hit){hit.el.scrollIntoView({behavior:"smooth",block:"center"});}showToast(hit?"検索した文章の位置へ移動しました。":"ファイルを開きました。検索語が見つからない場合は本文を確認してください。");});box.appendChild(b);});
 }
 
 /* =========================
@@ -1232,39 +1767,70 @@ async function searchRegisteredMarkdown(){
    ========================= */
 function saveCurrentFileTags(){
   if(!state.currentFile)return showToast("先にMarkdownファイルを開いてください。");
-  const tags=[...new Set($("tag-editor").value.split(/[，,]/).map(x=>x.trim()).filter(Boolean).map(x=>x.slice(0,40)))].slice(0,20);
+  const tags=[...new Set($("tag-editor").value.split(/[，,、]/).map(x=>x.trim()).filter(Boolean).map(x=>x.slice(0,40)))].slice(0,20);
   state.progress.__fileTags=state.progress.__fileTags||{};
   state.progress.__fileTags[state.currentFile.id]={tags,updatedAt:new Date().toISOString()};
-  state.fileTags=state.progress.__fileTags; state.localRevision++;state.progressDirty=true;persistLocalProgress();applyFilter();queueProgressSave();
+  state.fileTags=state.progress.__fileTags; markProgressChanged();applyFilter(true);queueProgressSave();
   showToast(tags.length?`タグを${tags.length}件保存しました。`:"タグを削除しました。");
 }
 function fileById(id){return state.files.find(f=>f.id===id)||state.registeredFiles.find(f=>f.id===id)||null;}
+/* 読書キュー：削除は墓標方式、並び順はorderで管理 */
+function activeQueue(){
+  return (state.progress.__readingQueue||[]).filter(x=>!x.deleted)
+    .sort((a,b)=>(Number.isFinite(a.order)?a.order:1e9)-(Number.isFinite(b.order)?b.order:1e9)||new Date(a.updatedAt||0)-new Date(b.updatedAt||0));
+}
 function addCurrentToQueue(){
   if(!state.currentFile)return showToast("先にMarkdownファイルを開いてください。");
-  const q=state.progress.__readingQueue||[];
-  if(q.some(x=>x.fileId===state.currentFile.id&&!x.deleted))return showToast("この文書は既に読書キューにあります。");
-  q.push({fileId:state.currentFile.id,name:state.currentFile.name,path:state.currentFile.path,updatedAt:new Date().toISOString()});
-  state.progress.__readingQueue=q;state.readingQueue=q;state.localRevision++;state.progressDirty=true;persistLocalProgress();queueProgressSave();renderQueuePanel();showToast("読書キューに追加しました。");
+  const q=state.progress.__readingQueue=state.progress.__readingQueue||[];
+  const active=activeQueue();
+  const existing=q.find(x=>x.fileId===state.currentFile.id);
+  if(existing&&!existing.deleted)return showToast("この文書は既に読書キューにあります。");
+  const now=new Date().toISOString(), order=active.length;
+  if(existing){existing.deleted=false;existing.order=order;existing.name=state.currentFile.name;existing.path=state.currentFile.path;existing.updatedAt=now;}
+  else q.push({fileId:state.currentFile.id,name:state.currentFile.name,path:state.currentFile.path,order,updatedAt:now});
+  state.readingQueue=q;markProgressChanged();queueProgressSave();renderQueuePanel();showToast("読書キューに追加しました。");
 }
 function removeQueueItem(fileId){
-  state.progress.__readingQueue=(state.progress.__readingQueue||[]).filter(x=>x.fileId!==fileId);
-  state.readingQueue=state.progress.__readingQueue;state.localRevision++;state.progressDirty=true;persistLocalProgress();queueProgressSave();renderQueuePanel();
+  const item=(state.progress.__readingQueue||[]).find(x=>x.fileId===fileId); if(!item)return;
+  item.deleted=true; item.updatedAt=new Date().toISOString();
+  state.readingQueue=state.progress.__readingQueue;markProgressChanged();queueProgressSave();renderQueuePanel();
+}
+function moveQueueItem(fileId,direction){
+  const list=activeQueue(), idx=list.findIndex(x=>x.fileId===fileId), j=idx+direction;
+  if(idx<0||j<0||j>=list.length)return;
+  const now=new Date().toISOString();
+  list.forEach((q,i)=>{if(q.order!==i){q.order=i;q.updatedAt=now;}}); // 並び順を連番に整える
+  const a=list[idx], b=list[j];
+  [a.order,b.order]=[b.order,a.order]; a.updatedAt=now; b.updatedAt=now;
+  markProgressChanged();queueProgressSave();renderQueuePanel();
 }
 function renderQueuePanel(){
   const panel=$("queue-panel");panel.innerHTML="";
-  const queue=(state.progress.__readingQueue||[]).filter(x=>!x.deleted);
+  const queue=activeQueue();
   const heading=document.createElement("div");heading.className="font-semibold mb-1";heading.textContent=`次に読む（${queue.length}件）`;panel.appendChild(heading);
   if(!queue.length){const empty=document.createElement("div");empty.className="text-slate-500 py-1";empty.textContent="読書キューは空です。本文画面から追加できます。";panel.appendChild(empty);}
-  queue.forEach(item=>{const row=document.createElement("div");row.className="flex items-center gap-1 border-t py-1";const open=document.createElement("button");open.className="text-left flex-1 truncate hover:underline";open.textContent=item.name||fileById(item.fileId)?.name||item.fileId;open.addEventListener("click",async()=>{const f=fileById(item.fileId);if(f)await openFile(f);else showToast("このファイルは一覧に見つかりません。OneDriveを同期してください。");});const del=document.createElement("button");del.textContent="削除";del.className="text-slate-500";del.addEventListener("click",()=>removeQueueItem(item.fileId));row.append(open,del);panel.appendChild(row);});
+  queue.forEach((item,i)=>{
+    const row=document.createElement("div");row.className="flex items-center gap-1 border-t py-1";
+    const open=document.createElement("button");open.type="button";open.className="text-left flex-1 truncate hover:underline";open.textContent=item.name||fileById(item.fileId)?.name||item.fileId;
+    open.addEventListener("click",async()=>{const f=fileById(item.fileId);if(f)await openFile(f);else showToast("このファイルは一覧に見つかりません。OneDriveを同期してください。");});
+    const mkBtn=(label,title,handler,disabled)=>{const b=document.createElement("button");b.type="button";b.textContent=label;b.title=title;b.className="border rounded px-2 py-1 text-slate-600 disabled:opacity-30";b.disabled=!!disabled;b.addEventListener("click",handler);return b;};
+    row.append(open,
+      mkBtn("↑","上へ",()=>moveQueueItem(item.fileId,-1),i===0),
+      mkBtn("↓","下へ",()=>moveQueueItem(item.fileId,1),i===queue.length-1),
+      mkBtn("削除","キューから外す",()=>removeQueueItem(item.fileId)));
+    panel.appendChild(row);
+  });
   const recent=Object.entries(state.progress).filter(([k,v])=>!k.startsWith("__")&&v&&v.updatedAt).sort((a,b)=>new Date(b[1].updatedAt)-new Date(a[1].updatedAt)).slice(0,8);
   const rh=document.createElement("div");rh.className="font-semibold mt-3 mb-1";rh.textContent="最近読んだ文書";panel.appendChild(rh);
   if(!recent.length){const e=document.createElement("div");e.className="text-slate-500";e.textContent="閲覧履歴はありません。";panel.appendChild(e);}
-  recent.forEach(([id])=>{const f=fileById(id);if(!f)return;const b=document.createElement("button");b.className="block w-full text-left truncate py-1 hover:underline";b.textContent=f.name;b.addEventListener("click",()=>openFile(f));panel.appendChild(b);});
+  recent.forEach(([id])=>{const f=fileById(id);if(!f)return;const b=document.createElement("button");b.type="button";b.className="block w-full text-left truncate py-1 hover:underline";b.textContent=f.name;b.addEventListener("click",()=>openFile(f));panel.appendChild(b);});
 }
 function exportAnnotationsMarkdown(){
-  const all=state.progress.__annotations||{};const fileIds=Object.keys(all);if(!fileIds.length)return showToast("出力する注釈がありません。");
+  const all=state.progress.__annotations||{};
+  const fileIds=Object.keys(all).filter(id=>activeAnnotations(id).length);
+  if(!fileIds.length)return showToast("出力する注釈がありません。");
   const lines=["# Markdown Reader - ハイライト・メモ・しおり","",`出力日時：${new Date().toLocaleString("ja-JP")}`];
-  for(const id of fileIds){const f=fileById(id);const items=all[id]||[];if(!items.length)continue;lines.push("","## "+(f?.name||id),"");for(const item of items){if(item.type==="highlight")lines.push(`> 🖍 ${String(item.quote||"").replace(/\n/g,"\n> ")}`,"");else if(item.type==="note")lines.push(`> ${String(item.quote||"").replace(/\n/g,"\n> ")}`,"",`**メモ：** ${item.note||""}`,"");else if(item.type==="bookmark")lines.push(`### ☆ ${item.label||"しおり"}`,item.quote?`> ${item.quote}`:"","");}}
+  for(const id of fileIds){const f=fileById(id);const items=activeAnnotations(id);lines.push("","## "+(f?.name||id),"");for(const item of items){if(item.type==="highlight")lines.push(`> 🖍 ${String(item.quote||"").replace(/\n/g,"\n> ")}`,"");else if(item.type==="note")lines.push(`> ${String(item.quote||"").replace(/\n/g,"\n> ")}`,"",`**メモ：** ${item.note||""}`,"");else if(item.type==="bookmark")lines.push(`### ☆ ${item.label||"しおり"}`,item.quote?`> ${item.quote}`:"","");}}
   const blob=new Blob([lines.join("\n")],{type:"text/markdown;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="markdown-reader-annotations-"+new Date().toISOString().slice(0,10)+".md";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);showToast("注釈をMarkdownファイルとして出力しました。");
 }
 
@@ -1299,6 +1865,20 @@ function applyTheme(theme) {
 }
 function initTheme() { let saved="light"; try { saved=localStorage.getItem("md_reader_theme")||"light"; } catch(_){} applyTheme(saved); }
 
+/* =========================
+   リンクの安全対策
+   外部リンクは新しいタブで開き、opener経由の乗っ取りを防ぐ
+   ========================= */
+function initSanitizerHooks() {
+  DOMPurify.addHook("afterSanitizeAttributes", node => {
+    if (node.tagName === "A" && node.hasAttribute("href")) {
+      if ((node.getAttribute("href") || "").startsWith("#")) return;
+      node.setAttribute("target", "_blank");
+      node.setAttribute("rel", "noopener noreferrer");
+    }
+  });
+}
+
 initTocResizer();
 
 /* =========================
@@ -1307,6 +1887,13 @@ initTocResizer();
 $("markdown-viewer").addEventListener("wheel", () => { state.lastLocalInteractionAt = Date.now(); }, { passive: true });
 $("markdown-viewer").addEventListener("touchmove", () => { state.lastLocalInteractionAt = Date.now(); }, { passive: true });
 $("markdown-viewer").addEventListener("keydown", () => { state.lastLocalInteractionAt = Date.now(); });
+$("markdown-viewer").addEventListener("scroll", () => {
+  updateReadingProgress();
+  // 読み込み中・位置復元中のスクロールは保存しない（保存済みの位置を上書きしないため）
+  if (!state.viewerReady || !state.currentFile || state.restoringPosition || Date.now() < state.suppressScrollUntil) return;
+  state.lastLocalInteractionAt = Date.now();
+  scheduleProgressSave(state.currentFile.id);
+}, { passive: true });
 $("theme-btn").addEventListener("click", () => applyTheme(state.theme === "dark" ? "light" : "dark"));
 $("library-pane-toggle").addEventListener("click", () => applyLibraryVisibility(!state.libraryHidden));
 document.addEventListener("keydown", e => {
@@ -1319,7 +1906,7 @@ function setTocVisible(visible) {
   panel.classList.toggle("hidden", !visible);
   layout.classList.toggle("toc-visible", visible);
   $("toc-toggle").setAttribute("aria-expanded", String(visible));
-  if (visible) applyTocWidth(getSavedTocWidth());
+  if (visible) { applyTocWidth(getSavedTocWidth()); const i=state.tocCurrent; state.tocCurrent=-2; setTocCurrent(i); }
 }
 function getSavedTocWidth() {
   let n=220; try { n=Number(localStorage.getItem("md_reader_toc_width")) || 220; } catch(_){}
@@ -1342,26 +1929,35 @@ function initTocResizer() {
 $("toc-toggle").addEventListener("click",()=>setTocVisible($("toc-panel").classList.contains("hidden")));
 ["font-size-select","line-height-select","content-width-select"].forEach(id=>$(id).addEventListener("change",saveReaderSettings));
 $("focus-toggle").addEventListener("click",()=>{state.focusMode=!state.focusMode;$("markdown-viewer").classList.toggle("focus-mode",state.focusMode);if(state.focusMode){setTocVisible(false);}$("focus-toggle").textContent=state.focusMode?"通常表示":"集中モード";});
+
+/* 文字選択を保つ：PCはmousedownの既定動作を止め、iOSは選択変更のたびに直前の選択を保持する */
+["highlight-btn","note-btn","bookmark-btn"].forEach(id => $(id).addEventListener("mousedown", e => e.preventDefault()));
+document.addEventListener("selectionchange", () => {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || sel.isCollapsed) return;
+  const r = sel.getRangeAt(0);
+  if ($("markdown-viewer").contains(r.commonAncestorContainer)) state.lastSel = { range: r.cloneRange(), time: Date.now() };
+});
 $("highlight-btn").addEventListener("click",addHighlight);
 $("note-btn").addEventListener("click",addNote);
 $("bookmark-btn").addEventListener("click",addBookmark);
 $("annotations-toggle").addEventListener("click",()=>{const p=$("annotations-panel");p.classList.toggle("hidden");if(!p.classList.contains("hidden"))renderAnnotations();});
 $("save-tags-btn").addEventListener("click",saveCurrentFileTags);
-$("tag-filter-input").addEventListener("input",applyFilter);
+$("tag-filter-input").addEventListener("input",()=>applyFilter());
 $("queue-add-btn").addEventListener("click",addCurrentToQueue);
 $("queue-toggle").addEventListener("click",()=>{const p=$("queue-panel");p.classList.toggle("hidden");if(!p.classList.contains("hidden"))renderQueuePanel();});
 $("export-notes-btn").addEventListener("click",exportAnnotationsMarkdown);
 $("fulltext-btn").addEventListener("click",searchRegisteredMarkdown);
-$("fulltext-input").addEventListener("keydown",e=>{if(e.key==="Enter")searchRegisteredMarkdown();});
-$("group-select").addEventListener("change", applyFilter);
+$("fulltext-input").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.isComposing&&e.keyCode!==229)searchRegisteredMarkdown();});
+$("group-select").addEventListener("change", () => applyFilter());
 $("add-group-btn").addEventListener("click", createGroup);
 $("rename-group-btn").addEventListener("click", renameGroup);
 $("delete-group-btn").addEventListener("click", deleteGroup);
 $("login-btn").addEventListener("click", login);
 $("logout-btn").addEventListener("click", logout);
 $("sync-btn").addEventListener("click", syncDrive);
-$("filter-input").addEventListener("input", applyFilter);
-$("more-btn").addEventListener("click", renderMoreFiles);
+$("filter-input").addEventListener("input", () => applyFilter());
+$("more-btn").addEventListener("click", () => renderMoreFiles());
 $("show-registered-btn").addEventListener("click", () => setListMode("registered"));
 $("show-search-btn").addEventListener("click", () => setListMode("search"));
 document.addEventListener("visibilitychange", () => {
@@ -1369,18 +1965,18 @@ document.addEventListener("visibilitychange", () => {
   else pollRemoteProgress();
 });
 window.addEventListener("pagehide", () => {
-  if (state.currentFile && state.lastLocalInteractionAt > state.lastLocalSavedAt) {
+  if (state.currentFile && state.viewerReady && state.lastLocalInteractionAt > state.lastLocalSavedAt) {
     markLocalProgress(state.currentFile.id, captureReadingPosition());
     // pagehideでは完了保証がないため、直前の定期保存・デバウンス保存を主とする。
     queueProgressSave();
   }
 });
 window.addEventListener("beforeunload", () => {
-  if (state.currentFile) {
+  if (state.currentFile && state.viewerReady) {
     state.progress[state.currentFile.id] = {
       ...captureReadingPosition(), updatedAt: new Date().toISOString()
     };
-    try { localStorage.setItem("md_reader_progress_backup", JSON.stringify(state.progress)); } catch (_) {}
+    persistLocalProgress();
   }
 });
 
@@ -1389,12 +1985,13 @@ window.addEventListener("beforeunload", () => {
     initTheme();
     initLibraryVisibility();
     applyReaderSettings();
+    initSanitizerHooks();
     state.db = await openDatabase();
     await initAuth();
   } catch (err) {
     console.error(err);
-    setListStatus("初期化エラー：" + errorMessage(err));
-    showToast("初期化に失敗しました：" + errorMessage(err), 8000);
+    setListStatus("初期化エラー：" + describeError(err));
+    showToast("初期化に失敗しました：" + describeError(err), 8000);
   }
 })();
 })();
