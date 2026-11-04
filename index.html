@@ -53,7 +53,14 @@
   #reader-toolbar {display:flex;flex-wrap:wrap;gap:.45rem;align-items:center;margin-bottom:.65rem;padding:.55rem;border:1px solid #e2e8f0;border-radius:.6rem;background:#f8fafc}
   #reader-toolbar button,#reader-toolbar select {font-size:.75rem;border:1px solid #cbd5e1;border-radius:.4rem;padding:.35rem .55rem;background:white;color:#334155}
   #reader-layout {display:flex;gap:.8rem;min-height:0;flex:1}
-  #toc-panel {width:220px;flex-shrink:0;overflow:auto;border-right:1px solid #e2e8f0;padding-right:.6rem;font-size:.78rem}
+  #toc-panel {width:var(--toc-width,220px);flex:0 0 var(--toc-width,220px);min-width:140px;max-width:420px;overflow:auto;border-right:1px solid #e2e8f0;padding-right:.6rem;font-size:.78rem}
+  #toc-resizer {width:8px;flex:0 0 8px;cursor:col-resize;position:relative;touch-action:none;user-select:none;display:none}
+  #toc-resizer::after {content:"";position:absolute;top:0;bottom:0;left:3px;width:2px;background:#cbd5e1;border-radius:2px}
+  #toc-resizer:hover::after,#toc-resizer.dragging::after {background:#3b82f6;width:3px;left:2.5px}
+  #toc-resizer:focus-visible {outline:2px solid #3b82f6;outline-offset:-2px}
+  #reader-layout.toc-visible #toc-resizer {display:block}
+  body[data-theme="dark"] #toc-resizer::after {background:#475569}
+  body[data-theme="dark"] #toc-resizer:hover::after,body[data-theme="dark"] #toc-resizer.dragging::after {background:#60a5fa}
   #toc-panel button {display:block;text-align:left;width:100%;padding:.28rem .4rem;border-radius:.3rem;color:#475569}
   #toc-panel button:hover {background:#e2e8f0}
   #reader-main {display:flex;flex-direction:column;min-width:0;flex:1;min-height:0}
@@ -69,8 +76,8 @@
   body[data-theme="dark"] #reading-progress-track {background:#334155}
   body[data-theme="dark"] #markdown-viewer mark.reader-highlight {background:#854d0e;color:#fef3c7}
   body[data-theme="dark"] #markdown-viewer blockquote {background:#1e293b}
-  @media(max-width:760px){#toc-panel{width:145px}#reader-layout{gap:.4rem}}
-  @media(max-width:520px){#toc-panel{display:none}}
+  @media(max-width:760px){#reader-layout{gap:.4rem}}
+  @media(max-width:520px){#toc-panel{display:none}#toc-resizer{display:none !important}}
   /* ファイル一覧ペインを隠したときは閲覧領域を最大化 */
   #app-main.library-hidden > #library-pane { display:none !important; }
   #app-main.library-hidden > #viewer-panel { width:100%; height:calc(100vh - 6.5rem) !important; }
@@ -161,6 +168,7 @@
     <div id="reading-progress-track"><div id="reading-progress-fill"></div></div>
     <div id="reader-layout">
       <nav id="toc-panel" class="hidden" aria-label="目次"><div class="text-slate-400 p-2">見出しはありません</div></nav>
+      <div id="toc-resizer" role="separator" aria-label="目次の幅を変更" aria-orientation="vertical" aria-valuemin="140" aria-valuemax="420" tabindex="0" title="ドラッグして目次の幅を変更"></div>
       <div id="reader-main">
         <div id="annotations-panel" class="hidden border rounded-lg p-2 mb-2 max-h-40 overflow-y-auto text-xs"></div>
         <div id="markdown-viewer" class="overflow-y-auto flex-1 min-h-0 pr-2">
@@ -1291,6 +1299,8 @@ function applyTheme(theme) {
 }
 function initTheme() { let saved="light"; try { saved=localStorage.getItem("md_reader_theme")||"light"; } catch(_){} applyTheme(saved); }
 
+initTocResizer();
+
 /* =========================
    イベント
    ========================= */
@@ -1304,9 +1314,34 @@ document.addEventListener("keydown", e => {
     e.preventDefault(); applyLibraryVisibility(!state.libraryHidden);
   }
 });
-$("toc-toggle").addEventListener("click",()=>$("toc-panel").classList.toggle("hidden"));
+function setTocVisible(visible) {
+  const panel=$("toc-panel"), layout=$("reader-layout");
+  panel.classList.toggle("hidden", !visible);
+  layout.classList.toggle("toc-visible", visible);
+  $("toc-toggle").setAttribute("aria-expanded", String(visible));
+  if (visible) applyTocWidth(getSavedTocWidth());
+}
+function getSavedTocWidth() {
+  let n=220; try { n=Number(localStorage.getItem("md_reader_toc_width")) || 220; } catch(_){}
+  return Math.max(140, Math.min(420, n));
+}
+function applyTocWidth(width) {
+  const w=Math.max(140,Math.min(420,Math.round(width)));
+  document.documentElement.style.setProperty("--toc-width", w+"px");
+  const r=$("toc-resizer"); r.setAttribute("aria-valuenow", String(w));
+  try { localStorage.setItem("md_reader_toc_width", String(w)); } catch(_){}
+}
+function initTocResizer() {
+  applyTocWidth(getSavedTocWidth());
+  const handle=$("toc-resizer"); let dragging=false;
+  const move=e=>{ if(!dragging)return; const layout=$("reader-layout").getBoundingClientRect(); applyTocWidth(e.clientX-layout.left); };
+  const stop=()=>{ if(!dragging)return; dragging=false; handle.classList.remove("dragging"); document.body.style.cursor=""; document.body.style.userSelect=""; window.removeEventListener("pointermove",move); window.removeEventListener("pointerup",stop); window.removeEventListener("pointercancel",stop); };
+  handle.addEventListener("pointerdown",e=>{ if($("toc-panel").classList.contains("hidden"))return; dragging=true; handle.classList.add("dragging"); document.body.style.cursor="col-resize"; document.body.style.userSelect="none"; handle.setPointerCapture?.(e.pointerId); window.addEventListener("pointermove",move); window.addEventListener("pointerup",stop); window.addEventListener("pointercancel",stop); e.preventDefault(); });
+  handle.addEventListener("keydown",e=>{ const current=getSavedTocWidth(); if(e.key==="ArrowLeft"||e.key==="ArrowRight"){e.preventDefault();applyTocWidth(current+(e.key==="ArrowRight"?20:-20));}});
+}
+$("toc-toggle").addEventListener("click",()=>setTocVisible($("toc-panel").classList.contains("hidden")));
 ["font-size-select","line-height-select","content-width-select"].forEach(id=>$(id).addEventListener("change",saveReaderSettings));
-$("focus-toggle").addEventListener("click",()=>{state.focusMode=!state.focusMode;$("markdown-viewer").classList.toggle("focus-mode",state.focusMode);$("toc-panel").classList.toggle("hidden",state.focusMode);$("focus-toggle").textContent=state.focusMode?"通常表示":"集中モード";});
+$("focus-toggle").addEventListener("click",()=>{state.focusMode=!state.focusMode;$("markdown-viewer").classList.toggle("focus-mode",state.focusMode);if(state.focusMode){setTocVisible(false);}$("focus-toggle").textContent=state.focusMode?"通常表示":"集中モード";});
 $("highlight-btn").addEventListener("click",addHighlight);
 $("note-btn").addEventListener("click",addNote);
 $("bookmark-btn").addEventListener("click",addBookmark);
