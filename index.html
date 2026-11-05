@@ -84,6 +84,13 @@
   #reader-main {display:flex;flex-direction:column;min-width:0;flex:1;min-height:0}
   #reading-progress-track {height:4px;background:#e2e8f0;border-radius:9px;overflow:hidden;margin-bottom:.55rem}
   #reading-progress-fill {height:100%;width:0;background:#2563eb;transition:width .12s}
+  /* 集中モード：読みながら使う操作だけを残し、本文を最大化 */
+  body.focus-on > header, body.focus-on #library-pane, body.focus-on #viewer-header, body.focus-on #reader-toolbar > :not(.fm-keep) {display:none!important}
+  body.focus-on #app-main {padding:.35rem}
+  body.focus-on #viewer-panel {height:calc(100dvh - .7rem);padding:.5rem .75rem;border-radius:.6rem}
+  body.focus-on #reader-toolbar {margin-bottom:.35rem;padding:.25rem .4rem;gap:.3rem}
+  body.focus-on #reader-toolbar button, body.focus-on #reader-toolbar select {padding:.25rem .5rem}
+  @media(pointer:coarse){body.focus-on #reader-toolbar button, body.focus-on #reader-toolbar select{min-height:36px}}
   #markdown-viewer.focus-mode {max-width:900px;margin:auto;width:100%;padding-left:1rem;padding-right:1rem}
   #markdown-viewer mark.reader-highlight {background:#fde68a;color:#422006;border-radius:2px;padding:0 .05em}
   #markdown-viewer mark.reader-note {background:transparent;color:inherit;border-bottom:2px dotted #f59e0b}
@@ -219,7 +226,7 @@
     </div>
     <div id="reader-toolbar">
       <button id="library-pane-toggle" type="button" aria-expanded="true" title="ファイル一覧ペインの表示・非表示を切り替え">☰ ファイル一覧を隠す</button>
-      <button id="toc-toggle" type="button">☷ 目次</button>
+      <button id="toc-toggle" class="fm-keep" type="button">☷ 目次</button>
       <label class="text-xs">文字 <select id="font-size-select"><option value="14">小</option><option value="15" selected>標準</option><option value="17">大</option><option value="19">特大</option></select></label>
       <label class="text-xs">行間 <select id="line-height-select"><option value="1.5">狭い</option><option value="1.75">標準</option><option value="2">広い</option><option value="2.2">ゆったり</option></select></label>
       <label class="text-xs">本文幅 <select id="content-width-select"><option value="100%">広い</option><option value="900px" selected>標準</option><option value="700px">狭い</option></select></label>
@@ -227,15 +234,15 @@
       <label class="text-xs">背景 <select id="paper-select" title="セピアはライトテーマのときに有効"><option value="plain">標準</option><option value="sepia">セピア</option></select></label>
       <label class="text-xs">向き <select id="writing-select"><option value="horizontal">横書き</option><option value="vertical">縦書き</option></select></label>
       <label class="text-xs">タップ送り <select id="tap-paging-select" title="画面の左右端をタップしてページ送り"><option value="off">なし</option><option value="on">あり</option></select></label>
-      <button id="page-prev-btn" type="button" title="前のページ（Shift+Space / K）">▲ 前頁</button>
-      <button id="page-next-btn" type="button" title="次のページ（Space / J）">▼ 次頁</button>
+      <button id="page-prev-btn" class="fm-keep" type="button" title="前のページ（Shift+Space / K）">▲ 前頁</button>
+      <button id="page-next-btn" class="fm-keep" type="button" title="次のページ（Space / J）">▼ 次頁</button>
       <button id="find-toggle" type="button" title="本文内を検索（/ キー）">🔍 本文検索</button>
       <button id="read-toggle" type="button" title="この文書の読了／未読を切り替え">✓ 読了にする</button>
-      <button id="focus-toggle" type="button">集中モード</button>
-      <select id="marker-color-select" title="マーカーの色" aria-label="マーカーの色"><option value="yellow">🟡 黄</option><option value="green">🟢 緑</option><option value="red">🔴 赤</option><option value="blue">🔵 青</option></select>
-      <button id="highlight-btn" type="button">🖍 マーカー</button>
-      <button id="note-btn" type="button">✎ メモ</button>
-      <button id="bookmark-btn" type="button">☆ しおり</button>
+      <button id="focus-toggle" class="fm-keep" type="button">集中モード</button>
+      <select id="marker-color-select" class="fm-keep" title="マーカーの色" aria-label="マーカーの色"><option value="yellow">🟡 黄</option><option value="green">🟢 緑</option><option value="red">🔴 赤</option><option value="blue">🔵 青</option></select>
+      <button id="highlight-btn" class="fm-keep" type="button">🖍 マーカー</button>
+      <button id="note-btn" class="fm-keep" type="button">✎ メモ</button>
+      <button id="bookmark-btn" class="fm-keep" type="button">☆ しおり</button>
       <button id="annotations-toggle" type="button">注釈一覧</button>
       <input id="tag-editor" type="text" placeholder="タグ（カンマ区切り）" title="この文書のタグ" class="border rounded px-2 py-1 text-xs">
       <button id="save-tags-btn" type="button">タグ保存</button>
@@ -2375,7 +2382,7 @@ $("markdown-viewer").addEventListener("wheel",e=>{ // 縦書きでは縦ホイ�
   e.preventDefault(); $("markdown-viewer").scrollLeft-=e.deltaY;
 },{passive:false});
 ["font-size-select","line-height-select","content-width-select","font-family-select","paper-select","writing-select","tap-paging-select"].forEach(id=>$(id).addEventListener("change",saveReaderSettings));
-$("focus-toggle").addEventListener("click",()=>keepTopAnchor(()=>{state.focusMode=!state.focusMode;$("markdown-viewer").classList.toggle("focus-mode",state.focusMode);if(state.focusMode){setTocVisible(false);}$("focus-toggle").textContent=state.focusMode?"通常表示":"集中モード";}));
+$("focus-toggle").addEventListener("click",()=>keepTopAnchor(()=>{state.focusMode=!state.focusMode;$("markdown-viewer").classList.toggle("focus-mode",state.focusMode);document.body.classList.toggle("focus-on",state.focusMode);if(state.focusMode){setTocVisible(false);}$("focus-toggle").textContent=state.focusMode?"通常表示":"集中モード";}));
 
 /* 文字選択を保つ：PCはmousedownの既定動作を止め、iOSは選択変更のたびに直前の選択を保持する */
 ["highlight-btn","note-btn","bookmark-btn"].forEach(id => $(id).addEventListener("mousedown", e => e.preventDefault()));
