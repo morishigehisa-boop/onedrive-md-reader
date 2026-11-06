@@ -84,6 +84,8 @@
   #reader-main {display:flex;flex-direction:column;min-width:0;flex:1;min-height:0}
   #reading-progress-track {height:4px;background:#e2e8f0;border-radius:9px;overflow:hidden;margin-bottom:.55rem}
   #reading-progress-fill {height:100%;width:0;background:#2563eb;transition:width .12s}
+  #focus-toggle {font-weight:700;background:#dbeafe!important;border-color:#60a5fa!important;color:#1e40af!important;white-space:nowrap}
+  body[data-theme="dark"] #focus-toggle {background:#1e3a5f!important;color:#bfdbfe!important}
   /* 集中モード：読みながら使う操作だけを残し、本文を最大化 */
   body.focus-on > header, body.focus-on #library-pane, body.focus-on #viewer-header, body.focus-on #reader-toolbar > :not(.fm-keep) {display:none!important}
   body.focus-on #app-main {padding:.35rem}
@@ -225,6 +227,7 @@
       <span id="progress-status" class="text-xs text-slate-500 whitespace-nowrap">閲覧位置</span>
     </div>
     <div id="reader-toolbar">
+      <button id="focus-toggle" class="fm-keep" type="button">集中モード</button>
       <button id="library-pane-toggle" type="button" aria-expanded="true" title="ファイル一覧ペインの表示・非表示を切り替え">☰ ファイル一覧を隠す</button>
       <button id="toc-toggle" class="fm-keep" type="button">☷ 目次</button>
       <label class="text-xs">文字 <select id="font-size-select"><option value="14">小</option><option value="15" selected>標準</option><option value="17">大</option><option value="19">特大</option></select></label>
@@ -238,7 +241,6 @@
       <button id="page-next-btn" class="fm-keep" type="button" title="次のページ（Space / J）">▼ 次頁</button>
       <button id="find-toggle" type="button" title="本文内を検索（/ キー）">🔍 本文検索</button>
       <button id="read-toggle" type="button" title="この文書の読了／未読を切り替え">✓ 読了にする</button>
-      <button id="focus-toggle" class="fm-keep" type="button">集中モード</button>
       <select id="marker-color-select" class="fm-keep" title="マーカーの色" aria-label="マーカーの色"><option value="yellow">🟡 黄</option><option value="green">🟢 緑</option><option value="red">🔴 赤</option><option value="blue">🔵 青</option></select>
       <button id="highlight-btn" class="fm-keep" type="button">🖍 マーカー</button>
       <button id="note-btn" class="fm-keep" type="button">✎ メモ</button>
@@ -2285,7 +2287,7 @@ function applyLibraryVisibility(hidden, persist = true) {
   state.libraryHidden = !!hidden;
   $("app-main").classList.toggle("library-hidden", state.libraryHidden);
   const btn = $("library-pane-toggle");
-  btn.textContent = state.libraryHidden ? "☰ ファイル一覧を表示" : "☰ ファイル一覧を隠す";
+  btn.textContent = state.libraryHidden ? "☰ ファイル一覧" : "☰ ファイル一覧を隠す";
   btn.setAttribute("aria-expanded", state.libraryHidden ? "false" : "true");
   btn.title = state.libraryHidden ? "ファイル一覧ペインを再表示" : "ファイル一覧ペインを非表示";
   if (persist) {
